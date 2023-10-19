@@ -43,7 +43,15 @@ class Category(StrEnum):
 
 
 class ConstructionStep(IntEnum):
-    '''Steps of corpus construction.'''
+    '''Steps of corpus construction.
+
+    START: Before building corpus.
+    DOWNLOAD: Downloading repos.
+    EXTRACT: Extracting and tokenizing raw data from repos.
+    ANNOTATE: Annotating utterances.
+    END: After building corpus.
+
+    '''
     START = enum.auto()
     DOWNLOAD = enum.auto()
     EXTRACT = enum.auto()
