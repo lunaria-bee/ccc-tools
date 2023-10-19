@@ -30,8 +30,11 @@ def download_repos():
 
 
 def main(argv):
-    logging.basicConfig(level=logging.INFO)
+    # Setup logging.
+    logging.getLogger().addHandler(logging.StreamHandler())
+    logging.getLogger().setLevel(logging.INFO)
 
+    # Build corpus.
     download_repos()
 
     # TODO Extract data
