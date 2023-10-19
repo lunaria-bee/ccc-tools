@@ -7,7 +7,6 @@ from defines import ITEM_START
 from defines import REPODIR_PATH
 from defines import REPOLIST_PATH
 
-from nltk import word_tokenize
 from pathlib import Path
 
 import git
@@ -40,7 +39,7 @@ def write_utterance_to_corpus_file(
         token=ITEM_START,
     )
 
-    for token in word_tokenize(utterance):
+    for token in nltk.word_tokenize(utterance):
         write_line_to_corpus_file(
             corpus_file,
             category=Category.TOKEN,
