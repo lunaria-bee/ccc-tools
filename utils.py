@@ -11,6 +11,7 @@ from pathlib import Path
 
 import git
 import logging
+import nltk
 import os
 import re
 import shutil
