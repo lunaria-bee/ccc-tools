@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 
+from defines import ConstructionStep
 from defines import CORPUSDIR_PATH
 from defines import ITEM_END
 from defines import ITEM_START
@@ -18,6 +19,30 @@ import sys
 
 
 parser = ArgumentParser()
+
+parser.add_argument(
+    '--redo',
+    action='store_true',
+    help="Rebuild entire corpus.",
+)
+
+parser.add_argument(
+    '--redo-from',
+    choices=('download', 'extract', 'annotate'),
+    help=(
+        "Partially rebuild corpus beginning from a particular step."
+        + " Not currently implemented for 'extract' or 'annotate'."
+    ),
+)
+
+# TODO implement extract redo
+# TODO implement annotate redo
+
+# TODO implement
+# parser.add_argument(
+#     '--redo-annotation',
+#     help="Partially re-annotate corpus.",
+# )
 
 parser.add_argument(
     '-v',
@@ -47,14 +72,14 @@ parser.add_argument(
 )
 
 
-def download_repos():
+def download_repos(force_redownload=False):
     '''Download repositories listed in repolist.txt.'''
 
     logging.info("Retrieving repos...")
 
     for repo in RepoManager.get_repolist():
         logging.info(f" {repo.name}")
-        downloaded = repo.download()
+        downloaded = repo.download(force_redownload)
 
     logging.info("Finished retrieving repos.")
 
@@ -95,15 +120,16 @@ def main(argv):
 
     # Process arguments.
     log_level = logging.INFO
-    debug_output = False
+    enable_debug_output = False
     enable_logging = True
+    redo_level = ConstructionStep.END
 
     if args.v:
         log_level = logging.DEBUG
 
     if args.d:
         log_level = logging.DEBUG
-        debug_output = True
+        enable_debug_output = True
 
     if args.V:
         log_level = logging.WARNING
@@ -111,10 +137,16 @@ def main(argv):
     if args.q:
         enable_logging = False
 
+    if args.redo_from:
+        redo_level = ConstructionStep.from_string(args.redo_from)
+
+    if args.redo:
+        redo_level = ConstructionStep.START
+
     # Setup logging.
     if enable_logging:
         handler = logging.StreamHandler()
-        if debug_output:
+        if enable_debug_output:
             handler.setFormatter(logging.Formatter(
                 "%(asctime)s [%(filename)s:%(lineno)d] [%(levelname)s] %(message)s"
             ))
@@ -123,7 +155,7 @@ def main(argv):
         logging.getLogger().setLevel(log_level)
 
     # Build corpus.
-    download_repos()
+    download_repos(force_redownload=(redo_level<=ConstructionStep.DOWNLOAD))
     extract_data()
     # TODO Annotate data
 

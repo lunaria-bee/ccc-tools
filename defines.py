@@ -1,8 +1,11 @@
 '''Commonly-used type and value definitions.'''
 
 
+from enum import IntEnum
 from enum import StrEnum
 from pathlib import Path
+
+import enum
 
 
 REPOLIST_PATH = Path('./repolist.txt')
@@ -37,3 +40,22 @@ class Category(StrEnum):
     '''
     TOKEN = 'T'
     CONTROL = 'C'
+
+
+class ConstructionStep(IntEnum):
+    '''Steps of corpus construction.'''
+    START = enum.auto()
+    DOWNLOAD = enum.auto()
+    EXTRACT = enum.auto()
+    ANNOTATE = enum.auto()
+    END = enum.auto()
+
+    @classmethod
+    def from_string(cls, s):
+        return {
+            'start': cls.START,
+            'download': cls.DOWNLOAD,
+            'extract': cls.EXTRACT,
+            'annotate': cls.ANNOTATE,
+            'end': cls.END,
+        }[s.lower()]
