@@ -1,4 +1,5 @@
 # Corpus data directoriess
+corpus/*
 repos/*
 
 # Emacs backup files
