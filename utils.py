@@ -2,6 +2,7 @@
 
 
 from defines import Category
+from defines import FIELDS
 from defines import ITEM_END
 from defines import ITEM_START
 from defines import REPODIR_PATH
@@ -53,6 +54,13 @@ def write_utterance_to_corpus_file(
         category=Category.CONTROL,
         token=ITEM_END,
     )
+
+
+def read_corpus_file(corpus_file):
+    return [
+        dict(zip(FIELDS, line.strip().split(',')))
+        for line in corpus_file.readlines()
+    ]
 
 
 class RepoManager:
