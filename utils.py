@@ -2,12 +2,15 @@
 
 
 from defines import Category
+from defines import CORPUSDIR_PATH
 from defines import FIELDS
 from defines import ITEM_END
 from defines import ITEM_START
 from defines import REPODIR_PATH
 from defines import REPOLIST_PATH
 
+from contextlib import ExitStack
+from itertools import chain
 from pathlib import Path
 
 import git
@@ -61,6 +64,19 @@ def read_corpus_file(corpus_file):
         dict(zip(FIELDS, line.strip().split(',')))
         for line in corpus_file.readlines()
     ]
+
+
+def get_corpus(*args):
+    '''Get whole corpus as list of dicts.
+
+    args: Arbitrary number of note types expressed as strings.
+
+    Return: List of dicts, where each dict contains a token and its annotation data.
+
+    '''
+    return list(chain.from_iterable(
+        repo.get_corpus(*args) for repo in RepoManager.get_repolist()
+    ))
 
 
 class RepoManager:
@@ -132,6 +148,28 @@ class RepoManager:
             logging.debug(f"{self._name}: Done.")
 
         return download
+
+    def get_corpus(self, *args):
+        '''Get corpus representation of this repo.
+
+        args: Arbitrary number of note types expressed as strings.
+
+        Return: List of dicts, where each dict contains a token and its annotation data.
+
+        '''
+        if not args:
+            paths = CORPUSDIR_PATH.glob(f'*.{self._name}.csv')
+        else:
+            paths = [
+                CORPUSDIR_PATH / Path(f'{subcorpus}.{self._name}.csv')
+                for subcorpus in args
+            ]
+
+        with ExitStack() as stack:
+            files = [stack.enter_context(open(path)) for path in paths]
+            corpus = list(chain.from_iterable(read_corpus_file(f) for f in files))
+
+        return corpus
 
     @property
     def url(self):
