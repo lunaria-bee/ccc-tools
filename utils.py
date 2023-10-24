@@ -68,6 +68,9 @@ class RepoManager:
     def __str__(self):
         return self._name
 
+    def __repr__(self):
+        return f"RepoManager({self._name})"
+
     @staticmethod
     def get_repolist(repolist_path=REPOLIST_PATH):
         '''Get list of RepoManager objects created from repolist file.'''
