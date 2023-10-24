@@ -11,6 +11,7 @@ from utils import RepoManager
 from utils import write_utterance_to_corpus_file
 
 from argparse import ArgumentParser
+from hashlib import sha1
 from pathlib import Path
 
 import logging
@@ -103,7 +104,7 @@ def extract_data():
                 write_utterance_to_corpus_file(
                     commit_messages_file,
                     commit.message,
-                    author=commit.author,
+                    author=sha1(commit.author.name.encode('utf-8')).hexdigest(),
                 )
 
     logging.info("Finished extracting data.")
