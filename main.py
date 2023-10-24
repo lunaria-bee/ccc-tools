@@ -52,6 +52,15 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '-d',
+    action='store_true',
+    help=(
+        "Print as much logging output to stderr as with -v, plus include detailed"
+        + " log annotations in each line of logging output."
+    ),
+)
+
+parser.add_argument(
     '-V',
     action='store_true',
     help="Print less logging output to stderr.",
@@ -61,15 +70,6 @@ parser.add_argument(
     '-q',
     action='store_true',
     help="Do not print any logging output to stderr.",
-)
-
-parser.add_argument(
-    '-d',
-    action='store_true',
-    help=(
-        "Print as much logging output to stderr as with -v, plus include detailed"
-        + " log annotations in each line of logging output."
-    ),
 )
 
 
