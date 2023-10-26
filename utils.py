@@ -21,21 +21,21 @@ import re
 import shutil
 
 
-def write_line_to_corpus_file(
-        corpus_file,
-        category='',
-        token='',
-        author='',
-):
-    '''Write one line of a corpus to a file.'''
-    corpus_file.write(f'{category},{token},{author}\n')
+def write_line_to_corpus_file(corpus_file, **kwargs):
+    '''Write one line of a corpus to a file.
+
+    Line fields accepted as keyword arguments, with argument names from defines.FIELDS.
+
+    '''
+    # corpus_file.write(f'{category},{token},{author}\n')
+    corpus_file.write(",".join(
+        kwargs[f] if f in kwargs.keys() else ''
+        for f in FIELDS
+    ))
+    corpus_file.write("\n")
 
 
-def write_utterance_to_corpus_file(
-        corpus_file,
-        utterance,
-        author='',
-):
+def write_utterance_to_corpus_file(corpus_file, utterance, **kwargs):
     '''Write a complete utterance of a corpus to a file.'''
 
     write_line_to_corpus_file(
@@ -49,7 +49,7 @@ def write_utterance_to_corpus_file(
             corpus_file,
             category=Category.TOKEN,
             token=token,
-            author=author,
+            **kwargs,
         )
 
     write_line_to_corpus_file(
