@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 
+from corpus import write_utterance_to_corpus_file
 from defines import ConstructionStep
 from defines import CORPUSDIR_PATH
 from defines import ITEM_END
 from defines import ITEM_START
 from defines import REPOLIST_PATH
 from defines import REPODIR_PATH
-from utils import RepoManager
-from utils import write_utterance_to_corpus_file
+from repo import RepoManager
 
 from argparse import ArgumentParser
 from hashlib import sha1
