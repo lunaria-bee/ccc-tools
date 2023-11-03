@@ -111,7 +111,7 @@ def extract_data():
 
 
 def main(argv):
-    args = parser.parse_args(argv[1:])
+    args = parser.parse_args(argv)
 
     # Validate arguments.
     if (args.v or args.d) and (args.V or args.q):
@@ -163,4 +163,4 @@ def main(argv):
     pass
 
 
-if __name__== '__main__': main(sys.argv)
+if __name__== '__main__': main(sys.argv[1:])
