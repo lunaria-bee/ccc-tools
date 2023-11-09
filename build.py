@@ -120,31 +120,32 @@ def extract_data(force_reextract=()):
     for repo in RepoManager.get_repolist():
         logging.info(f" {repo.name}")
 
-        commit_messages_path = CORPUSDIR_PATH / Path(f'commit_messages.{repo.name}.xml')
+        # Extract changelogs.
+        changelogs_path = CORPUSDIR_PATH / Path(f'{NoteType.CHANGELOG}.{repo.name}.xml')
 
         # Only extract data if corpus file does not exist or if we are forced to by
         # force_reextract.
         if (
-                NoteType.COMMIT_MESSAGE in force_reextract
-                or not commit_messages_path.exists()
+                NoteType.CHANGELOG in force_reextract
+                or not changelogs_path.exists()
         ):
-            commit_messages_root = ElementTree.Element('notes')
+            changelogs_root = ElementTree.Element('notes')
             for commit in repo.git.iter_commits():
                 note = ElementTree.SubElement(
-                    commit_messages_root,
+                    changelogs_root,
                     'note',
                     attrib={
-                        'author': anonymize_id(commit.author.name),
+                        'author': anonymize_id(commit.author.name), # TODO anonymize other name occurrences
                         'repo': repo.name,
                         # TODO revision
-                        'note_type': NoteType.COMMIT_MESSAGE,
+                        'note_type': NoteType.CHANGELOG,
                     }
                 )
                 note.text = normalize_string(commit.message)
 
-            commit_messages_tree = ElementTree.ElementTree(commit_messages_root)
-            commit_messages_tree.write(
-                commit_messages_path,
+            changelogs_tree = ElementTree.ElementTree(changelogs_root)
+            changelogs_tree.write(
+                changelogs_path,
                 encoding='utf-8',
                 xml_declaration=True,
             )

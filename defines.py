@@ -48,11 +48,11 @@ class ConstructionStep(IntEnum):
 class NoteType(StrEnum):
     '''Types of source code annotations.
 
+    CHANGELOG
     COMMENT
-    COMMIT_MESSAGE
     DOCUMENTATION
 
     '''
+    CHANGELOG = 'changelog'
     COMMENT = 'comment'
-    COMMIT_MESSAGE = 'commit-message'
     DOCUMENTATION = 'documentation'
