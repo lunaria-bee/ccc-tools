@@ -107,7 +107,7 @@ def extract_data(force_reextract=()):
         logging.info(f" {repo.name}")
 
         commit_messages_path = CORPUSDIR_PATH / Path(f'commit_messages.{repo.name}.xml')
-        if NoteType.COMMENT in force_reextract or not commit_messages_path.exists():
+        if NoteType.COMMIT_MESSAGE in force_reextract or not commit_messages_path.exists():
             commit_messages_root = ElementTree.Element('notes')
             for commit in repo.git.iter_commits():
                 note = ElementTree.SubElement(
