@@ -121,10 +121,8 @@ def extract_data(force_reextract=()):
         logging.info(f" {repo.name}")
 
         # Extract changelogs.
+        logging.debug(f"  {NoteType.CHANGELOG}")
         changelogs_path = CORPUSDIR_PATH / Path(f'{NoteType.CHANGELOG}.{repo.name}.xml')
-
-        # Only extract data if corpus file does not exist or if we are forced to by
-        # force_reextract.
         if (
                 NoteType.CHANGELOG in force_reextract
                 or not changelogs_path.exists()
@@ -146,6 +144,59 @@ def extract_data(force_reextract=()):
             changelogs_tree = ElementTree.ElementTree(changelogs_root)
             changelogs_tree.write(
                 changelogs_path,
+                encoding='utf-8',
+                xml_declaration=True,
+            )
+
+        # Extract comments.
+        logging.debug(f"  {NoteType.COMMENT}")
+        comments_path = CORPUSDIR_PATH / Path(f'{NoteType.COMMENT}.{repo.name}.xml')
+        if (
+                NoteType.COMMENT in force_reextract
+                or not comments_path.exists()
+        ):
+            comments_root = ElementTree.Element('notes')
+
+            for source_path in repo.dir.glob('**/*.py'):
+
+                with open(source_path) as source_file:
+                    source_lines = source_file.readlines()
+
+                current_comment = ""
+                last_line_had_comment = False
+                for line in source_lines:
+
+                    match = re.search(r'(#.*)$', line)
+                    if match:
+                        if last_line_had_comment:
+                            # Continue accumulating comment.
+                            current_comment += f"{match.group(1)}\n"
+                        else:
+                            # Create node for previously accumulated comment.
+                            # TODO Filter commented code.
+                            note = ElementTree.SubElement(
+                                comments_root,
+                                'note',
+                                attrib={
+                                    # TODO author
+                                    'repo': repo.name,
+                                    # TODO revision
+                                    'note-type': NoteType.COMMENT,
+                                }
+                            )
+                            note.text = current_comment.strip()
+
+                            # Start accumulating new comment.
+                            current_comment = f"{match.group(1)}\n"
+
+                        last_line_had_comment = True
+
+                    else:
+                        last_line_had_comment = False
+
+            comments_tree = ElementTree.ElementTree(comments_root)
+            comments_tree.write(
+                comments_path,
                 encoding='utf-8',
                 xml_declaration=True,
             )
