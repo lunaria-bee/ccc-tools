@@ -9,7 +9,7 @@ from defines import REPODIR_PATH
 from repo import RepoManager
 
 from argparse import ArgumentParser
-from hashlib import sha1 as name_hash
+from hashlib import sha256 as anon_hash
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -84,6 +84,11 @@ def normalize_string(s):
     return s.translate({7: ''})
 
 
+def anonymize_id(s):
+    '''Hash an identifying string to anonymize it.'''
+    return anon_hash(s.encode('utf-8')).hexdigest()[:16]
+
+
 def download_repos(force_redownload=False):
     '''Download repositories listed in repolist.txt.
 
@@ -129,7 +134,7 @@ def extract_data(force_reextract=()):
                     commit_messages_root,
                     'note',
                     attrib={
-                        'author': name_hash(commit.author.name.encode('utf-8')).hexdigest(),
+                        'author': anonymize_id(commit.author.name),
                         'repo': repo.name,
                         # TODO revision
                         'note_type': NoteType.COMMIT_MESSAGE,
