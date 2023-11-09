@@ -128,10 +128,12 @@ def extract_data(force_reextract=()):
                 note = ElementTree.SubElement(
                     commit_messages_root,
                     'note',
-                    author=name_hash(commit.author.name.encode('utf-8')).hexdigest(),
-                    repo=repo.name,
-                    # TODO revision
-                    note_type=NoteType.COMMIT_MESSAGE,
+                    attrib={
+                        'author': name_hash(commit.author.name.encode('utf-8')).hexdigest(),
+                        'repo': repo.name,
+                        # TODO revision
+                        'note_type': NoteType.COMMIT_MESSAGE,
+                    }
                 )
                 note.text = normalize_string(commit.message)
 
