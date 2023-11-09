@@ -78,6 +78,12 @@ parser.add_argument(
 )
 
 
+def normalize_string(s):
+    '''Correct irregularities in string content.'''
+    # Strip bell character (unicode x07) from string.
+    return s.translate({7: ''})
+
+
 def download_repos(force_redownload=False):
     '''Download repositories listed in repolist.txt.'''
 
@@ -104,20 +110,22 @@ def extract_data(force_reextract=()):
         if NoteType.COMMENT in force_reextract or not commit_messages_path.exists():
             commit_messages_root = ElementTree.Element('notes')
             for commit in repo.git.iter_commits():
-                ElementTree.SubElement(
+                note = ElementTree.SubElement(
                     commit_messages_root,
                     'note',
-                    text=commit.message,
-                    attrib={
-                        'author': name_hash(commit.author.name.encode('utf-8')).hexdigest(),
-                        'repo': repo.name,
-                        # TODO revision
-                        'note-type': NoteType.COMMIT_MESSAGE,
-                    }
+                    author=name_hash(commit.author.name.encode('utf-8')).hexdigest(),
+                    repo=repo.name,
+                    # TODO revision
+                    note_type=NoteType.COMMIT_MESSAGE,
                 )
+                note.text = normalize_string(commit.message)
 
             commit_messages_tree = ElementTree.ElementTree(commit_messages_root)
-            commit_messages_tree.write(commit_messages_path)
+            commit_messages_tree.write(
+                commit_messages_path,
+                encoding='utf-8',
+                xml_declaration=True,
+            )
 
     logging.info("Finished extracting data.")
 
