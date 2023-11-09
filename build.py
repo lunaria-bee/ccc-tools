@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 
 
-from corpus import write_utterance_to_corpus_file
 from defines import ConstructionStep
+from defines import NoteType
 from defines import CORPUSDIR_PATH
-from defines import ITEM_END
-from defines import ITEM_START
 from defines import REPOLIST_PATH
 from defines import REPODIR_PATH
 from repo import RepoManager
 
 from argparse import ArgumentParser
-from hashlib import sha1
+from hashlib import sha1 as name_hash
 from pathlib import Path
+from xml.etree import ElementTree
 
 import logging
 import re
@@ -93,19 +92,24 @@ def extract_data():
     CORPUSDIR_PATH.mkdir(exist_ok=True)
 
     for repo in RepoManager.get_repolist():
-        commit_messages_path = CORPUSDIR_PATH / Path(f'commit_messages.{repo.name}.csv')
-
         logging.info(f" {repo.name}")
 
-        # Write commits.
-        with open(commit_messages_path, 'w') as commit_messages_file:
-            commit_count = len(list(repo.git.iter_commits()))
-            for i, commit in enumerate(repo.git.iter_commits()):
-                write_utterance_to_corpus_file(
-                    commit_messages_file,
-                    commit.message,
-                    author=sha1(commit.author.name.encode('utf-8')).hexdigest(),
-                )
+        commit_messages_root = ElementTree.Element('notes')
+        for commit in repo.git.iter_commits():
+            ElementTree.SubElement(
+                commit_messages_root,
+                'note',
+                text=commit.message,
+                attrib={
+                    'author': name_hash(commit.author.name.encode('utf-8')).hexdigest(),
+                    'repo': repo.name,
+                    # TODO revision
+                    'note-type': NoteType.COMMIT_MESSAGE,
+                }
+            )
+
+        commit_messages_tree = ElementTree.ElementTree(commit_messages_root)
+        commit_messages_tree.write(CORPUSDIR_PATH / Path(f'commit_messages.{repo.name}.xml'))
 
     logging.info("Finished extracting data.")
 

@@ -17,30 +17,6 @@ REPODIR_PATH = Path('./repos')
 CORPUSDIR_PATH = Path('./corpus')
 '''Path to the directory where corpus data is stored.'''
 
-FIELDS = (
-    'category', # see CATEGORIES
-    'token',    # raw text of the token
-    'author',   # author of the text in the token
-)
-'''Field structure for each line of corpus CSV files.'''
-
-ITEM_START = '<s>'
-'''Item start control token.'''
-
-ITEM_END = '</s>'
-'''Item end control token'''
-
-
-class Category(StrEnum):
-    '''Token categories.
-
-    TOKEN: Token from a text in the corpus.
-    CONRTOL: Special token to indicate corpus structure.
-
-    '''
-    TOKEN = 'T'
-    CONTROL = 'C'
-
 
 class ConstructionStep(IntEnum):
     '''Steps of corpus construction.
@@ -67,3 +43,16 @@ class ConstructionStep(IntEnum):
             'annotate': cls.ANNOTATE,
             'end': cls.END,
         }[s.lower()]
+
+
+class NoteType(StrEnum):
+    '''Types of source code annotations.
+
+    COMMENT
+    COMMIT_MESSAGE
+    DOCUMENTATION
+
+    '''
+    COMMENT = 'comment'
+    COMMIT_MESSAGE = 'commit-message'
+    DOCUMENTATION = 'documentation'
