@@ -2,9 +2,20 @@
 
 
 from defines import NoteType
+from repo import RepoManager
 
 from nltk.corpus.reader.api import CategorizedCorpusReader
 from nltk.corpus.reader.xmldocs import XMLCorpusReader
+
+
+def get_fileid_components(fileid):
+    '''TODO'''
+    components = fileid.split('.')
+    return {
+        'note-type': NoteType(components[0]),
+        'repo': components[1],
+        'extension': components[2],
+    }
 
 
 class CccReader(CategorizedCorpusReader, XMLCorpusReader):
@@ -15,6 +26,27 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         fileids = r'.*?\..*?\.xml'
         XMLCorpusReader.__init__(self, root, fileids)
         CategorizedCorpusReader.__init__(self, kwargs={'cat_pattern': r'(.*?)\..*?\.xml'})
+
+    def fileids(self, categories=None, repos=None):
+        '''Return a list of file identifiers for the files that make up this corpus.
+
+        May optionally filter to a subcorpus using the categories and repos
+        arguments. These arguments can be used together, returning the intersection of the
+        fileid lists that would be created by using them separately.
+
+        categories: List of note categories (see defines.NoteType).
+        repos: List of repositories. Each element may be either the repository name as a
+               string, or a RepoManager object.
+
+        '''
+        fileids = CategorizedCorpusReader.fileids(self, categories)
+
+        if repos is not None:
+            repos = (repo.name if isinstance(repo, RepoManager) else repo for repo in repos)
+            fileids = [fileid for fileid in fileids
+                       if get_fileid_components(fileid)['repo'] in repos]
+
+        return fileids
 
     # TODO override xml()
     # TODO override words()
