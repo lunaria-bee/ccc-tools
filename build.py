@@ -85,7 +85,11 @@ def normalize_string(s):
 
 
 def download_repos(force_redownload=False):
-    '''Download repositories listed in repolist.txt.'''
+    '''Download repositories listed in repolist.txt.
+
+    force_redownload: Whether to redownload previously downloaded repositories.
+
+    '''
 
     logging.info("Retrieving repos...")
 
@@ -97,7 +101,12 @@ def download_repos(force_redownload=False):
 
 
 def extract_data(force_reextract=()):
-    '''Extract data from downloaded repos.'''
+    '''Extract data from downloaded repos.
+
+    force_reextract: Iterable of NoteType values. Data of these types will be extracted
+    from repos, even if that data has been extracted before.
+
+    '''
 
     logging.info("Extracting data...")
 
@@ -107,7 +116,13 @@ def extract_data(force_reextract=()):
         logging.info(f" {repo.name}")
 
         commit_messages_path = CORPUSDIR_PATH / Path(f'commit_messages.{repo.name}.xml')
-        if NoteType.COMMIT_MESSAGE in force_reextract or not commit_messages_path.exists():
+
+        # Only extract data if corpus file does not exist or if we are forced to by
+        # force_reextract.
+        if (
+                NoteType.COMMIT_MESSAGE in force_reextract
+                or not commit_messages_path.exists()
+        ):
             commit_messages_root = ElementTree.Element('notes')
             for commit in repo.git.iter_commits():
                 note = ElementTree.SubElement(
@@ -136,7 +151,7 @@ def main(argv):
     # Validate arguments.
     if (args.v or args.d) and (args.V or args.q):
         raise ValueError(
-            f"Incompatible opts {'-v' if args.v else '-d'} and {'-V' if args.V else '-q'}"
+            f"Incompatible opts {'-v' if args.v else '-d'} and {'-V' if args.V else '-q'}."
         )
 
     # Process arguments.
