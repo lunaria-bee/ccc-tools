@@ -40,6 +40,12 @@ parser.add_argument(
 
 # TODO implement
 # parser.add_argument(
+#     '--redo-extract',
+#     help="Partially re-extract corpus data.",
+# )
+
+# TODO implement
+# parser.add_argument(
 #     '--redo-annotation',
 #     help="Partially re-annotate corpus.",
 # )
@@ -84,7 +90,7 @@ def download_repos(force_redownload=False):
     logging.info("Finished retrieving repos.")
 
 
-def extract_data():
+def extract_data(force_reextract=()):
     '''Extract data from downloaded repos.'''
 
     logging.info("Extracting data...")
@@ -94,22 +100,24 @@ def extract_data():
     for repo in RepoManager.get_repolist():
         logging.info(f" {repo.name}")
 
-        commit_messages_root = ElementTree.Element('notes')
-        for commit in repo.git.iter_commits():
-            ElementTree.SubElement(
-                commit_messages_root,
-                'note',
-                text=commit.message,
-                attrib={
-                    'author': name_hash(commit.author.name.encode('utf-8')).hexdigest(),
-                    'repo': repo.name,
-                    # TODO revision
-                    'note-type': NoteType.COMMIT_MESSAGE,
-                }
-            )
+        commit_messages_path = CORPUSDIR_PATH / Path(f'commit_messages.{repo.name}.xml')
+        if NoteType.COMMENT in force_reextract or not commit_messages_path.exists():
+            commit_messages_root = ElementTree.Element('notes')
+            for commit in repo.git.iter_commits():
+                ElementTree.SubElement(
+                    commit_messages_root,
+                    'note',
+                    text=commit.message,
+                    attrib={
+                        'author': name_hash(commit.author.name.encode('utf-8')).hexdigest(),
+                        'repo': repo.name,
+                        # TODO revision
+                        'note-type': NoteType.COMMIT_MESSAGE,
+                    }
+                )
 
-        commit_messages_tree = ElementTree.ElementTree(commit_messages_root)
-        commit_messages_tree.write(CORPUSDIR_PATH / Path(f'commit_messages.{repo.name}.xml'))
+            commit_messages_tree = ElementTree.ElementTree(commit_messages_root)
+            commit_messages_tree.write(commit_messages_path)
 
     logging.info("Finished extracting data.")
 
@@ -159,12 +167,19 @@ def main(argv):
         logging.getLogger().addHandler(handler)
         logging.getLogger().setLevel(log_level)
 
-    # Build corpus.
-    download_repos(force_redownload=(redo_level<=ConstructionStep.DOWNLOAD))
-    extract_data()
-    # TODO Annotate data
+    # Download
+    redo_download = (redo_level <= ConstructionStep.DOWNLOAD)
+    download_repos(force_redownload=redo_download)
 
-    pass
+    # Extract.
+    if redo_level <= ConstructionStep.EXTRACT:
+        redo_note_types = tuple(NoteType)
+    else:
+        redo_note_types = tuple()
+
+    extract_data(force_reextract=redo_note_types)
+
+    # TODO Annotate.
 
 
 if __name__== '__main__': main(sys.argv[1:])
