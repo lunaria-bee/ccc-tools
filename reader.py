@@ -59,7 +59,7 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         fileids: List of fileids.
         categories: List of note categories (see defines.NoteType).
         repos: List of repositories. Each element may be either the repository name as a
-        string, or a RepoManager object. The list may contain a mixture of both.
+               string, or a RepoManager object. The list may contain a mixture of both.
 
         Return: xml.etree.ElementTree.Element tree representing the corpus.
 
