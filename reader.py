@@ -107,7 +107,7 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
                string, or a RepoManager object. The list may contain a mixture of both.
 
         '''
-        # TODO Stip comment delimeters.
+        # TODO Stip comment delimiters.
 
         fileids = self._filter_fileids(fileids, categories, repos)
 
