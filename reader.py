@@ -28,6 +28,26 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         XMLCorpusReader.__init__(self, root, fileids)
         CategorizedCorpusReader.__init__(self, kwargs={'cat_pattern': r'(.*?)\..*?\.xml'})
 
+    def _filter_fileids(self, fileids=None, categories=None, repos=None):
+        '''Return fileids that match all provided criteria.
+
+        If more than one of parameter is set, only return fileids that satisfy all
+        provided criteria.
+
+        fileids: List of fileids.
+        categories: List of note categories (see defines.NoteType).
+        repos: List of repositories. Each element may be either the repository name as a
+               string, or a RepoManager object. The list may contain a mixture of both.
+
+        Return: List of fileids that match all provided criteria.
+
+        '''
+        computed_fileids = self.fileids(categories, repos)
+        if fileids is None:
+            return computed_fileids
+        else:
+            return [fileid for fileid in fileids if fileid in computed_fileids]
+
     def fileids(self, categories=None, repos=None):
         '''Return a list of file identifiers for the files that make up this corpus.
 
@@ -64,12 +84,7 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         Return: xml.etree.ElementTree.Element tree representing the corpus.
 
         '''
-        computed_fileids = self.fileids(categories, repos)
-
-        if fileids is None:
-            fileids = computed_fileids
-        else:
-            fileids = (fileid for fileid in fileids if fileid in computed_fileids)
+        fileids = self._filter_fileids(fileids, categories, repos)
 
         xml_root = ElementTree.Element('notes')
         for fileid in fileids:
