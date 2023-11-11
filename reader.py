@@ -94,7 +94,29 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
 
         return xml_root
 
-    # TODO override words()
+    def words(self, fileids=None, categories=None, repos=None):
+        '''Get list of all tokens in corpus.
+
+        May optionally filter to a subcorpus using the fileids, categories, and repos
+        arguments. If more than one of these parameters is set, only select fileids that
+        satisfy all provided criteria.
+
+        fileids: List of fileids.
+        categories: List of note categories (see defines.NoteType).
+        repos: List of repositories. Each element may be either the repository name as a
+               string, or a RepoManager object. The list may contain a mixture of both.
+
+        '''
+        # TODO Stip comment delimeters.
+
+        fileids = self._filter_fileids(fileids, categories, repos)
+
+        words = []
+        for fileid in fileids:
+            words.extend(super().words(fileids=[fileid]))
+
+        return words
+
     # TODO override sents()
     # TODO delete paras()
     # TODO create notes()
