@@ -105,6 +105,66 @@ def download_repos(force_redownload=False):
     logging.info("Finished retrieving repos.")
 
 
+def _create_comment_subelement(parent, text, authors, repo):
+    '''TODO'''
+    elt = ElementTree.SubElement(
+        parent,
+        'note',
+        attrib={
+            'author': ','.join(authors), # TODO improve XML for multiple authors
+            'repo': repo.name,
+            # TODO revision
+            'note-type': NoteType.COMMENT,
+        }
+    )
+    elt.text = text
+
+    return elt
+
+
+def _accumulate_comment_author_pairs_from_source_file(path, repo):
+    '''TODO'''
+    comment = ""
+    authors = set()
+    last_line_had_comment = False
+    comment_author_pairs = []
+    for commit, lines in repo.git.blame('HEAD', path.relative_to(repo.dir)):
+        for line in lines:
+            match = re.search(r'(#.*)$', line)
+            if match:
+                if last_line_had_comment:
+                    # Continue accumulating comment.
+                    comment += f"{match.group(1)}\n"
+                    authors.add(anonymize_id(commit.author.name))
+                else:
+                    # Create node for previously accumulated comment.
+                    # TODO Filter commented code.
+                    comment_author_pairs.append((comment, authors))
+
+                    # Start accumulating new comment.
+                    comment = f"{match.group(1)}\n"
+                    authors = {anonymize_id(commit.author.name)}
+
+                    last_line_had_comment = True
+
+            else:
+                last_line_had_comment = False
+
+    return comment_author_pairs
+
+
+def _create_repo_comments_xml_tree(repo):
+    '''TODO'''
+    root = ElementTree.Element('notes')
+    for source_path in repo.dir.glob('**/*.py'):
+        comment_author_pairs = _accumulate_comment_author_pairs_from_source_file(source_path, repo)
+
+        for comment, authors in comment_author_pairs:
+            _create_comment_subelement(root, comment, authors, repo)
+
+    return ElementTree.ElementTree(root)
+
+
 def extract_data(force_reextract=()):
     '''Extract data from downloaded repos.
 
@@ -155,47 +215,7 @@ def extract_data(force_reextract=()):
                 NoteType.COMMENT in force_reextract
                 or not comments_path.exists()
         ):
-            comments_root = ElementTree.Element('notes')
-
-            for source_path in repo.dir.glob('**/*.py'):
-
-                comment = ""
-                authors = set()
-                last_line_had_comment = False
-                for commit, lines in repo.git.blame('HEAD', source_path.relative_to(repo.dir)):
-
-                    for line in lines:
-                        match = re.search(r'(#.*)$', line)
-                        if match:
-                            if last_line_had_comment:
-                                # Continue accumulating comment.
-                                comment += f"{match.group(1)}\n"
-                                authors.add(anonymize_id(commit.author.name))
-                            else:
-                                # Create node for previously accumulated comment.
-                                # TODO Filter commented code.
-                                note = ElementTree.SubElement(
-                                    comments_root,
-                                    'note',
-                                    attrib={
-                                        'author': ','.join(authors), # TODO improve XML for multiple authors
-                                        'repo': repo.name,
-                                        # TODO revision
-                                        'note-type': NoteType.COMMENT,
-                                    }
-                                )
-                                note.text = comment.strip()
-
-                                # Start accumulating new comment.
-                                comment = f"{match.group(1)}\n"
-                                authors = {anonymize_id(commit.author.name)}
-
-                            last_line_had_comment = True
-
-                        else:
-                            last_line_had_comment = False
-
-            comments_tree = ElementTree.ElementTree(comments_root)
+            comments_tree = _create_repo_comments_xml_tree(repo)
             comments_tree.write(
                 comments_path,
                 encoding='utf-8',
