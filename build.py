@@ -35,7 +35,6 @@ parser.add_argument(
     ),
 )
 
-# TODO implement extract redo
 # TODO implement annotate redo
 
 # TODO implement
