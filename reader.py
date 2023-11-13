@@ -6,6 +6,8 @@ from repo import RepoManager
 
 from nltk.corpus.reader.api import CategorizedCorpusReader
 from nltk.corpus.reader.xmldocs import XMLCorpusReader
+from nltk.tokenize import sent_tokenize
+from nltk.tokenize import word_tokenize
 from xml.etree import ElementTree
 
 import re
@@ -121,7 +123,21 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
 
     # TODO override sents()
     def sents(self, fileids=None, categories=None, repos=None):
-        '''TODO'''
+        '''Get a list of tokenized sentences.
+
+        May optionally filter to a subcorpus using the fileids, categories, and repos
+        arguments. If more than one of these parameters is set, only select fileids that
+        satisfy all provided criteria.
+
+        fileids: List of fileids.
+        categories: List of note categories (see defines.NoteType).
+        repos: List of repositories. Each element may be either the repository name as a
+               string, or a RepoManager object. The list may contain a mixture of both.
+
+        Return: List of sentences, where each element of the return list is itself a list
+                of the tokens in that sentence.
+
+        '''
         # TODO Strip comment delimiters.
 
         xml = self.xml(fileids, categories, repos)
@@ -130,7 +146,7 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         for note in xml:
             # Normalize whitespace.
             if note.text:
-                sents.extend(re.findall(r'.*?[\.\?\!][\s\b]', note.text))
+                sents.extend(word_tokenize(sent) for sent in sent_tokenize(note.text))
 
         return sents
 
