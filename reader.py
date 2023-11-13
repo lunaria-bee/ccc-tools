@@ -150,5 +150,4 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
 
         return sents
 
-    # TODO delete paras()
-    # TODO create notes()
+    # TODO override paras()
