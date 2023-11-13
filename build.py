@@ -159,40 +159,41 @@ def extract_data(force_reextract=()):
 
             for source_path in repo.dir.glob('**/*.py'):
 
-                with open(source_path) as source_file:
-                    source_lines = source_file.readlines()
-
-                current_comment = ""
+                comment = ""
+                authors = set()
                 last_line_had_comment = False
-                for line in source_lines:
+                for commit, lines in repo.git.blame('HEAD', source_path.relative_to(repo.dir)):
 
-                    match = re.search(r'(#.*)$', line)
-                    if match:
-                        if last_line_had_comment:
-                            # Continue accumulating comment.
-                            current_comment += f"{match.group(1)}\n"
+                    for line in lines:
+                        match = re.search(r'(#.*)$', line)
+                        if match:
+                            if last_line_had_comment:
+                                # Continue accumulating comment.
+                                comment += f"{match.group(1)}\n"
+                                authors.add(anonymize_id(commit.author.name))
+                            else:
+                                # Create node for previously accumulated comment.
+                                # TODO Filter commented code.
+                                note = ElementTree.SubElement(
+                                    comments_root,
+                                    'note',
+                                    attrib={
+                                        'author': ','.join(authors), # TODO improve XML for multiple authors
+                                        'repo': repo.name,
+                                        # TODO revision
+                                        'note-type': NoteType.COMMENT,
+                                    }
+                                )
+                                note.text = comment.strip()
+
+                                # Start accumulating new comment.
+                                comment = f"{match.group(1)}\n"
+                                authors = {anonymize_id(commit.author.name)}
+
+                            last_line_had_comment = True
+
                         else:
-                            # Create node for previously accumulated comment.
-                            # TODO Filter commented code.
-                            note = ElementTree.SubElement(
-                                comments_root,
-                                'note',
-                                attrib={
-                                    # TODO author
-                                    'repo': repo.name,
-                                    # TODO revision
-                                    'note-type': NoteType.COMMENT,
-                                }
-                            )
-                            note.text = current_comment.strip()
-
-                            # Start accumulating new comment.
-                            current_comment = f"{match.group(1)}\n"
-
-                        last_line_had_comment = True
-
-                    else:
-                        last_line_had_comment = False
+                            last_line_had_comment = False
 
             comments_tree = ElementTree.ElementTree(comments_root)
             comments_tree.write(
