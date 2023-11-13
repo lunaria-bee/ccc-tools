@@ -8,6 +8,8 @@ from nltk.corpus.reader.api import CategorizedCorpusReader
 from nltk.corpus.reader.xmldocs import XMLCorpusReader
 from xml.etree import ElementTree
 
+import re
+
 
 def get_fileid_components(fileid):
     '''TODO'''
@@ -118,5 +120,19 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         return words
 
     # TODO override sents()
+    def sents(self, fileids=None, categories=None, repos=None):
+        '''TODO'''
+        # TODO Strip comment delimiters.
+
+        xml = self.xml(fileids, categories, repos)
+
+        sents = []
+        for note in xml:
+            # Normalize whitespace.
+            if note.text:
+                sents.extend(re.findall(r'.*?[\.\?\!][\s\b]', note.text))
+
+        return sents
+
     # TODO delete paras()
     # TODO create notes()
