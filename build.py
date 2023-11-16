@@ -126,6 +126,7 @@ def _accumulate_comment_author_pairs_from_source_file(path, repo):
     comment = ""
     authors = set()
     last_line_had_comment = False
+    first_comment_found = False
     comment_author_pairs = []
     for commit, lines in repo.git.blame('HEAD', path.relative_to(repo.dir)):
         for line in lines:
@@ -138,7 +139,10 @@ def _accumulate_comment_author_pairs_from_source_file(path, repo):
                 else:
                     # Create node for previously accumulated comment.
                     # TODO Filter commented code.
-                    comment_author_pairs.append((comment, authors))
+                    if first_comment_found:
+                        comment_author_pairs.append((comment, authors))
+                    else:
+                        first_comment_found = True
 
                     # Start accumulating new comment.
                     comment = f"{match.group(1)}\n"
