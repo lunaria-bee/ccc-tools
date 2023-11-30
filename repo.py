@@ -149,7 +149,11 @@ class BlameIndex:
         return len(self._index)
 
     def __getitem__(self, key):
-        return self._index[key]
+        # Lines index from 1, list indexes from 0; decrement all indices by 1.
+        if isinstance(key, slice):
+            return self._index[slice(key.start-1, key.stop-1, key.step)]
+        else:
+            return self._index[key-1]
 
     def search(self, string):
         '''Return first index entry whose line contains `string`.'''

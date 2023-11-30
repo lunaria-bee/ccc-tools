@@ -226,8 +226,8 @@ def _accumulate_comment_author_pairs_from_source_file(path, repo):
                 if last_line_with_comment == token.start[0]-1:
                     # Continuation of previous comment.
                     comment += f"{token.string}\n"
-                    for blame in blame_index[token.start[0]-1:token.end[0]-1]:
-                        authors.add(blame.commit.author)
+                    for blame in blame_index[token.start[0]:token.end[0]+1]:
+                        authors.add(anonymize_id(blame.commit.author.name))
 
                 else:
                     # New comment.
@@ -249,8 +249,8 @@ def _accumulate_comment_author_pairs_from_source_file(path, repo):
 
                     comment = f"{token.string}\n"
                     authors = set(
-                        blame.commit.author
-                        for blame in blame_index[token.start[0]:token.end[0]]
+                        anonymize_id(blame.commit.author.name)
+                        for blame in blame_index[token.start[0]:token.end[0]+1]
                     )
 
                 last_line_with_comment = token.end[0]
