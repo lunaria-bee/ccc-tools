@@ -191,23 +191,6 @@ def is_comment_code(comment):
         return False
 
 
-def _create_comment_subelement(parent, text, authors, repo):
-    '''TODO'''
-    elt = ElementTree.SubElement(
-        parent,
-        'note',
-        attrib={
-            'author': ','.join(authors), # TODO improve XML for multiple authors
-            'repo': repo.name,
-            # TODO revision
-            'note-type': NoteType.COMMENT,
-        }
-    )
-    elt.text = text
-
-    return elt
-
-
 def _accumulate_comment_author_pairs_from_source_file(path, repo):
     '''TODO'''
     comment = ""
@@ -256,6 +239,23 @@ def _accumulate_comment_author_pairs_from_source_file(path, repo):
                 last_line_with_comment = token.end[0]
 
     return comment_author_pairs
+
+
+def _create_comment_subelement(parent, text, authors, repo):
+    '''TODO'''
+    elt = ElementTree.SubElement(
+        parent,
+        'note',
+        attrib={
+            'author': ','.join(authors), # TODO improve XML for multiple authors
+            'repo': repo.name,
+            # TODO revision
+            'note-type': NoteType.COMMENT,
+        }
+    )
+    elt.text = text
+
+    return elt
 
 
 def _create_repo_comments_xml_tree(repo):
