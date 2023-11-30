@@ -1,2 +1,2 @@
-https://github.com/kivy/kivy.git
-https://github.com/wrye-bash/wrye-bash.git
+https://github.com/kivy/kivy.git,33f0a03
+https://github.com/wrye-bash/wrye-bash.git,e25f924

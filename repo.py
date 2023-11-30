@@ -17,12 +17,14 @@ import shutil
 class RepoManager:
     '''Manage data and git interactions for a repository.'''
 
-    def __init__(self, url):
+    def __init__(self, url, rev='HEAD'):
         self._url = url
+        self._rev = rev
         self._name = RepoManager.get_name_from_url(url)
         # self._commit # TODO
         self._dir = REPODIR_PATH / Path(self._name)
         self._git = None
+        self._git_cmd = None
 
     def __str__(self):
         return self._name
@@ -34,7 +36,11 @@ class RepoManager:
     def get_repolist(repolist_path=REPOLIST_PATH):
         '''Get list of RepoManager objects created from repolist file.'''
         with open(repolist_path) as repolist_file:
-            repolist = [RepoManager(url) for url in [line.strip() for line in repolist_file.readlines()]]
+            repolist = [
+                RepoManager(url, rev)
+                for url, rev
+                in [line.strip().split(',') for line in repolist_file.readlines()]
+            ]
 
         return repolist
 
@@ -80,6 +86,8 @@ class RepoManager:
         if download:
             logging.debug(f"{self._name}: Downloading...")
             git.Repo.clone_from(self._url, self._dir)
+            logging.debug(f"{self._name}: Switching to revision {self._rev}")
+            self.git_cmd.checkout(self._rev)
             logging.debug(f"{self._name}: Done.")
 
         return download
@@ -88,6 +96,11 @@ class RepoManager:
     def url(self):
         '''URL to download the repository from.'''
         return self._url
+
+    @property
+    def rev(self):
+        '''Revision of the repository to checkout.'''
+        return self._rev
 
     @property
     def name(self):
@@ -101,7 +114,7 @@ class RepoManager:
 
     @property
     def git(self):
-        '''git.Repo object for version control interactions.'''
+        '''git.Repo object for version control information access.'''
         if self._git is None:
             if not self.is_available():
                 self.download()
@@ -109,6 +122,14 @@ class RepoManager:
             self._git = git.Repo(self._dir)
 
         return self._git
+
+    @property
+    def git_cmd(self):
+        '''git.cmd.Git object for git binary interactions.'''
+        if self._git_cmd is None:
+            self._git_cmd = git.cmd.Git(self._dir)
+
+        return self._git_cmd
 
 
 class _BlameIndexEntry:

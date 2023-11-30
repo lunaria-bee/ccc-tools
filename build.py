@@ -249,7 +249,7 @@ def _create_comment_subelement(parent, text, authors, repo):
         attrib={
             'author': ','.join(authors), # TODO improve XML for multiple authors
             'repo': repo.name,
-            # TODO revision
+            'revision': repo.rev,
             'note-type': NoteType.COMMENT,
         }
     )
@@ -312,7 +312,7 @@ def extract_data(force_reextract=()):
                     attrib={
                         'author': anonymize_id(commit.author.name), # TODO anonymize other name occurrences
                         'repo': repo.name,
-                        # TODO revision
+                        'revision': repo.rev,
                         'note_type': NoteType.CHANGELOG,
                     }
                 )
