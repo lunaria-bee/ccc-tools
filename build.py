@@ -3,6 +3,9 @@
 
 from defines import ConstructionStep
 from defines import NoteType
+from defines import BUILDNOTESDIR_PATH
+from defines import BUILDNOTES_INCLUDED_CODE_PATH
+from defines import BUILDNOTES_EXCLUDED_CODE_PATH
 from defines import CORPUSDIR_PATH
 from defines import REPOLIST_PATH
 from defines import REPODIR_PATH
@@ -13,9 +16,14 @@ from hashlib import sha256 as anon_hash
 from pathlib import Path
 from xml.etree import ElementTree
 
+import ast
 import logging
 import re
+import shutil
 import sys
+
+
+# TODO precompile regexes
 
 
 parser = ArgumentParser()
@@ -104,6 +112,79 @@ def download_repos(force_redownload=False):
     logging.info("Finished retrieving repos.")
 
 
+def trim_comment_as_code(comment):
+    '''Trim comment delimiters and leading whitespace, preserving indentation.
+
+    For this function to work, indentations *cannot* mix tabs and spaces.
+
+    '''
+    # Remove comment delimiters
+    comment = "\n".join(
+        line.lstrip('#') for line in comment.split('\n')
+    )
+
+    # Find amount of whitespace to remove. Result is smallest number of leading
+    # spaces/tabs on a line.
+    consistent_whitespace_regex = re.compile(r'( +|\t+)')
+    whitespace_width = float('inf')
+    for line in comment.split('\n'):
+        match = consistent_whitespace_regex.match(line)
+        if match and len(match.group()) < whitespace_width:
+            whitespace_width = len(match.group())
+
+    # Trim whitespace.
+    if whitespace_width != float('inf'):
+        comment = "\n".join(
+            line[whitespace_width:] for line in comment.split("\n")
+        )
+
+    return comment
+
+
+def ast_contains(tree, node_type):
+    '''Does `tree` contain a node of `node_type`?'''
+    if isinstance(tree, node_type):
+        return True
+
+    else:
+        return any(
+            ast_contains(node, node_type)
+            for node in ast.iter_child_nodes(tree)
+        )
+
+
+def is_comment_code(comment):
+    '''Is `comment` just commented out code?
+
+    This function does not simply check whether the comment is syntactically valid
+    code. For comments that are syntactically valid code, it also tries to determine
+    whether the comment is natural language that also happens to be syntactically valid
+    code. To be considered natural language, a syntactically valid code snippet must...
+
+    - ...*not* contain *any* of the following characters: '(', ')', '[', ']', '=', '.'
+    - ...*not* contain the text "return"
+
+    '''
+    trimmed_comment = trim_comment_as_code(comment)
+
+    try:
+        tree = ast.parse(trimmed_comment)
+
+        # Check if the comment, despite being valid code, is still something we want to
+        # interpret as English (alphanumeric strings optionally separated by operators).
+        if (
+                not set('()[]=.').intersection(set(trimmed_comment))
+                and 'return' not in trimmed_comment
+        ):
+            return False
+
+        # If all checks pass, is probably code.
+        return True
+
+    except SyntaxError:
+        return False
+
+
 def _create_comment_subelement(parent, text, authors, repo):
     '''TODO'''
     elt = ElementTree.SubElement(
@@ -123,6 +204,7 @@ def _create_comment_subelement(parent, text, authors, repo):
 
 def _accumulate_comment_author_pairs_from_source_file(path, repo):
     '''TODO'''
+    # TODO string literals containing '#' should NOT be accumulated
     comment = ""
     authors = set()
     last_line_had_comment = False
@@ -140,7 +222,20 @@ def _accumulate_comment_author_pairs_from_source_file(path, repo):
                     # Create node for previously accumulated comment.
                     # TODO Filter commented code.
                     if first_comment_found:
-                        comment_author_pairs.append((comment, authors))
+                        if is_comment_code(comment):
+                            with open(BUILDNOTES_EXCLUDED_CODE_PATH, 'a') as f:
+                                f.write(comment)
+                                f.write(f"\n{'<>'*32}\n")
+                        else:
+                            try:
+                                ast.parse(trim_comment_as_code(comment))
+                                with open(BUILDNOTES_INCLUDED_CODE_PATH, 'a') as f:
+                                    f.write(comment)
+                                    f.write(f"\n{'<>'*32}\n")
+                            except SyntaxError:
+                                pass
+
+                            comment_author_pairs.append((comment, authors))
                     else:
                         first_comment_found = True
 
@@ -179,6 +274,18 @@ def extract_data(force_reextract=()):
     logging.info("Extracting data...")
 
     CORPUSDIR_PATH.mkdir(exist_ok=True)
+
+    # Remove build_notes directory (if it exists).
+    if (
+            NoteType.COMMENT in force_reextract
+            and BUILDNOTESDIR_PATH.is_dir()
+    ):
+        shutil.rmtree(BUILDNOTESDIR_PATH)
+
+    # Recreate build_notes directory. It doesn't really matter if the directory already
+    # exists, but exist_ok is nonetheless ommitted; this is a sanity check, as the
+    # directory should not exist after the previous step.
+    BUILDNOTESDIR_PATH.mkdir()
 
     for repo in RepoManager.get_repolist():
         logging.info(f" {repo.name}")

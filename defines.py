@@ -17,6 +17,15 @@ REPODIR_PATH = Path('./repos')
 CORPUSDIR_PATH = Path('./corpus')
 '''Path to the directory where corpus data is stored.'''
 
+BUILDNOTESDIR_PATH = Path('./build_notes')
+'''Path to the directory where build notes are stored.'''
+
+BUILDNOTES_INCLUDED_CODE_PATH = BUILDNOTESDIR_PATH / Path('comments_code_included.txt')
+'''Path to the file that logs syntactically valid code that has been included in the corpus.'''
+
+BUILDNOTES_EXCLUDED_CODE_PATH = BUILDNOTESDIR_PATH / Path('comments_code_excluded.txt')
+'''Path to the file that logs syntactically valid code that has not been included in the corpus.'''
+
 
 class ConstructionStep(IntEnum):
     '''Steps of corpus construction.
