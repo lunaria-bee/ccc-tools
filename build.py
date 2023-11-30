@@ -9,6 +9,7 @@ from defines import BUILDNOTES_EXCLUDED_CODE_PATH
 from defines import CORPUSDIR_PATH
 from defines import REPOLIST_PATH
 from defines import REPODIR_PATH
+from repo import BlameIndex
 from repo import RepoManager
 
 from argparse import ArgumentParser
@@ -17,13 +18,18 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 import ast
+import collections
 import logging
 import re
 import shutil
 import sys
+import tokenize
 
 
 # TODO precompile regexes
+
+
+_CommentAuthorPair = collections.namedtuple('_CommentAuthorPair', ('comment', 'authors'))
 
 
 parser = ArgumentParser()
@@ -204,49 +210,50 @@ def _create_comment_subelement(parent, text, authors, repo):
 
 def _accumulate_comment_author_pairs_from_source_file(path, repo):
     '''TODO'''
-    # TODO string literals containing '#' should NOT be accumulated
     comment = ""
     authors = set()
     last_line_had_comment = False
     first_comment_found = False
     comment_author_pairs = []
-    for commit, lines in repo.git.blame('HEAD', path.relative_to(repo.dir)):
-        for line in lines:
-            match = re.search(r'(#.*)$', line)
-            if match:
-                if last_line_had_comment:
-                    # Continue accumulating comment.
-                    comment += f"{match.group(1)}\n"
-                    authors.add(anonymize_id(commit.author.name))
+
+    blame_index = BlameIndex(repo, 'HEAD', path.relative_to(repo.dir))
+    last_line_with_comment = 0 # tokenize functions index lines from 1
+
+    with tokenize.open(path) as source_file:
+        for token in tokenize.generate_tokens(source_file.readline):
+            if token.type == tokenize.COMMENT:
+
+                if last_line_with_comment == token.start[0]-1:
+                    # Continuation of previous comment.
+                    comment += f"{token.string}\n"
+                    for blame in blame_index[token.start[0]-1:token.end[0]-1]:
+                        authors.add(blame.commit.author)
+
                 else:
-                    # Create node for previously accumulated comment.
-                    # TODO Filter commented code.
-                    if first_comment_found:
+                    # New comment.
+                    if last_line_with_comment != 0:
+                        # Accumulate previous comment.
                         if is_comment_code(comment):
                             with open(BUILDNOTES_EXCLUDED_CODE_PATH, 'a') as f:
                                 f.write(comment)
-                                f.write(f"\n{'<>'*32}\n")
-                        else:
+                                f.write(f"{'<>'*32}\n")
                             try:
                                 ast.parse(trim_comment_as_code(comment))
                                 with open(BUILDNOTES_INCLUDED_CODE_PATH, 'a') as f:
                                     f.write(comment)
-                                    f.write(f"\n{'<>'*32}\n")
+                                    f.write(f"{'<>'*32}\n")
                             except SyntaxError:
                                 pass
 
-                            comment_author_pairs.append((comment, authors))
-                    else:
-                        first_comment_found = True
+                        comment_author_pairs.append(_CommentAuthorPair(comment, authors))
 
-                    # Start accumulating new comment.
-                    comment = f"{match.group(1)}\n"
-                    authors = {anonymize_id(commit.author.name)}
+                    comment = f"{token.string}\n"
+                    authors = set(
+                        blame.commit.author
+                        for blame in blame_index[token.start[0]:token.end[0]]
+                    )
 
-                    last_line_had_comment = True
-
-            else:
-                last_line_had_comment = False
+                last_line_with_comment = token.end[0]
 
     return comment_author_pairs
 

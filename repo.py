@@ -6,6 +6,7 @@ from defines import REPOLIST_PATH
 
 from pathlib import Path
 
+import collections
 import git
 import logging
 import os
@@ -108,3 +109,77 @@ class RepoManager:
             self._git = git.Repo(self._dir)
 
         return self._git
+
+
+class _BlameIndexEntry:
+    '''TODO'''
+
+    def __init__(self, commit, line):
+        self._commit = commit
+        self._line = line
+
+    @property
+    def commit(self):
+        return self._commit
+
+    @property
+    def line(self):
+        return self._line
+
+
+_BlameIndexEntry = collections.namedtuple('_BlameIndexEntry', ('commit', 'line'))
+'''TODO'''
+
+
+class BlameIndex:
+    '''TODO'''
+
+    def __init__(self, repo, rev, path):
+        self._raw_blame = repo.git.blame(rev, path)
+        self._repo = repo
+        self._rev = rev
+        self._path = path
+
+        self._index = []
+        for commit, lines in self._raw_blame:
+            for line in lines:
+                self._index.append(_BlameIndexEntry(commit, line))
+
+    def __len__(self):
+        return len(self._index)
+
+    def __getitem__(self, key):
+        return self._index[key]
+
+    def search(self, string):
+        '''Return first index entry whose line contains `string`.'''
+        for i, entry in self._index:
+            if string in entry.line:
+                return entry
+
+    def find_all(self, string):
+        '''Return all index entries whose line contains `string`.'''
+        return [
+            entry for entry in self._index
+            if string in entry.line
+        ]
+
+    @property
+    def raw_blame(self):
+        '''TODO'''
+        return self._raw_blame
+
+    @property
+    def repo(self):
+        '''TODO'''
+        return self._repo
+
+    @property
+    def rev(self):
+        '''TODO'''
+        return self._rev
+
+    @property
+    def path(self):
+        '''TODO'''
+        return self._path
