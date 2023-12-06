@@ -113,15 +113,24 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         '''
         # TODO Stip comment delimiters.
 
-        fileids = self._filter_fileids(fileids, categories, repos)
+        # fileids = self._filter_fileids(fileids, categories, repos)
+
+        # words = []
+        # for fileid in fileids:
+        #     words.extend(super().words(fileids=[fileid]))
+
+        xml = self.xml(fileids, categories, repos)
 
         words = []
-        for fileid in fileids:
-            words.extend(super().words(fileids=[fileid]))
+        for note in xml:
+            if note.find('tokens').text:
+                words.extend(note.find('tokens').text.split())
+            else:
+                # Empty comment; just delimiter(s).
+                words.append(" ")
 
         return words
 
-    # TODO override sents()
     def sents(self, fileids=None, categories=None, repos=None):
         '''Get a list of tokenized sentences.
 
@@ -144,10 +153,28 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
 
         sents = []
         for note in xml:
-            # Normalize whitespace.
-            if note.text:
-                sents.extend(word_tokenize(sent) for sent in sent_tokenize(note.text))
+            if note.find('tokens').text:
+                sents.extend(
+                    sent.split(' ')
+                    for sent in note.find('tokens').text.split('\n')
+                )
+            else:
+                # Empty comment; just delimiters.
+                sents.append([" "])
 
         return sents
+
+    def pos(self, fileids=None, categories=None, repos=None):
+        '''TODO'''
+        xml = self.xml(fileids, categories, repos)
+
+        word_pos_pairs = []
+        for note in xml:
+            if note.find('tokens').text:
+                words = note.find('tokens').text.split()
+                pos = note.find('pos').text.split()
+                word_pos_pairs.extend(zip(words, pos))
+
+        return word_pos_pairs
 
     # TODO override paras()

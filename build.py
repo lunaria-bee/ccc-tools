@@ -14,6 +14,9 @@ from repo import RepoManager
 
 from argparse import ArgumentParser
 from hashlib import sha256 as anon_hash
+from nltk.tag import pos_tag
+from nltk.tokenize import sent_tokenize
+from nltk.tokenize import word_tokenize
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -118,6 +121,13 @@ def download_repos(force_redownload=False):
     logging.info("Finished retrieving repos.")
 
 
+def strip_comment_delimiters(comment):
+    '''TODO'''
+    return "\n".join(
+        line.lstrip('#') for line in comment.split('\n')
+    )
+
+
 def trim_comment_as_code(comment):
     '''Trim comment delimiters and leading whitespace, preserving indentation.
 
@@ -125,9 +135,7 @@ def trim_comment_as_code(comment):
 
     '''
     # Remove comment delimiters
-    comment = "\n".join(
-        line.lstrip('#') for line in comment.split('\n')
-    )
+    comment = strip_comment_delimiters(comment)
 
     # Find amount of whitespace to remove. Result is smallest number of leading
     # spaces/tabs on a line.
@@ -241,21 +249,40 @@ def _accumulate_comment_author_pairs_from_source_file(path, repo):
     return comment_author_pairs
 
 
-def _create_comment_subelement(parent, text, authors, repo):
+def _create_note_subelement(parent, text, authors, note_type, repo):
     '''TODO'''
-    elt = ElementTree.SubElement(
+    note_elt = ElementTree.SubElement(
         parent,
         'note',
         attrib={
             'author': ','.join(authors), # TODO improve XML for multiple authors
             'repo': repo.name,
             'revision': repo.rev,
-            'note-type': NoteType.COMMENT,
+            'note-type': note_type,
         }
     )
-    elt.text = text
 
-    return elt
+    # XML element for raw text.
+    raw_elt = ElementTree.SubElement(note_elt, 'raw')
+    raw_elt.text = text
+
+    # Tokenize text. Strip delimiters from comments.
+    if note_type == NoteType.COMMENT:
+        stripped_text = strip_comment_delimiters(text)
+        sents = [word_tokenize(sent) for sent in sent_tokenize(stripped_text)]
+    else:
+        sents = [word_tokenize(sent) for sent in sent_tokenize(text)]
+
+    # XML element for tokens, separated by spaces, with sents separated by newlines.
+    tokens_elt = ElementTree.SubElement(note_elt, 'tokens')
+    tokens_elt.text = "\n".join(" ".join(token for token in sent) for sent in sents)
+
+    # XML element for POS tags, aligned to tokens, with same space/newline separation
+    # scheme.
+    pos_elt = ElementTree.SubElement(note_elt, 'pos')
+    pos_elt.text = "\n".join(" ".join(t[1] for t in pos_tag(sent)) for sent in sents)
+
+    return note_elt
 
 
 def _create_repo_comments_xml_tree(repo):
@@ -265,7 +292,7 @@ def _create_repo_comments_xml_tree(repo):
         comment_author_pairs = _accumulate_comment_author_pairs_from_source_file(source_path, repo)
 
         for comment, authors in comment_author_pairs:
-            _create_comment_subelement(root, comment, authors, repo)
+            _create_note_subelement(root, comment, authors, NoteType.COMMENT, repo)
 
     return ElementTree.ElementTree(root)
 
@@ -306,17 +333,14 @@ def extract_data(force_reextract=()):
         ):
             changelogs_root = ElementTree.Element('notes')
             for commit in repo.git.iter_commits():
-                note = ElementTree.SubElement(
-                    changelogs_root,
-                    'note',
-                    attrib={
-                        'author': anonymize_id(commit.author.name), # TODO anonymize other name occurrences
-                        'repo': repo.name,
-                        'revision': repo.rev,
-                        'note_type': NoteType.CHANGELOG,
-                    }
-                )
-                note.text = normalize_string(commit.message)
+                if commit.message:
+                    _create_note_subelement(
+                        changelogs_root,
+                        normalize_string(commit.message),
+                        [anonymize_id(commit.author.name)],
+                        NoteType.CHANGELOG,
+                        repo
+                    )
 
             changelogs_tree = ElementTree.ElementTree(changelogs_root)
             changelogs_tree.write(
