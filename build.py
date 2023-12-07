@@ -225,9 +225,14 @@ def _accumulate_comment_author_pairs_from_source_file(path, repo):
                     if last_line_with_comment != 0:
                         # Accumulate previous comment.
                         if is_comment_code(comment):
-                            with open(BUILDNOTES_EXCLUDED_CODE_PATH, 'a') as f:
-                                f.write(comment)
-                                f.write(f"{'<>'*32}\n")
+                            try:
+                                ast.parse(trim_comment_as_code(comment))
+                                with open(BUILDNOTES_EXCLUDED_CODE_PATH, 'a') as f:
+                                    f.write(comment)
+                                    f.write(f"{'<>'*32}\n")
+                            except SyntaxError:
+                                pass
+                        else:
                             try:
                                 ast.parse(trim_comment_as_code(comment))
                                 with open(BUILDNOTES_INCLUDED_CODE_PATH, 'a') as f:
@@ -315,11 +320,7 @@ def extract_data(force_reextract=()):
             and BUILDNOTESDIR_PATH.is_dir()
     ):
         shutil.rmtree(BUILDNOTESDIR_PATH)
-
-    # Recreate build_notes directory. It doesn't really matter if the directory already
-    # exists, but exist_ok is nonetheless ommitted; this is a sanity check, as the
-    # directory should not exist after the previous step.
-    BUILDNOTESDIR_PATH.mkdir()
+        BUILDNOTESDIR_PATH.mkdir()
 
     for repo in RepoManager.get_repolist():
         logging.info(f" {repo.name}")
