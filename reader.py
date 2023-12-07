@@ -6,11 +6,7 @@ from repo import RepoManager
 
 from nltk.corpus.reader.api import CategorizedCorpusReader
 from nltk.corpus.reader.xmldocs import XMLCorpusReader
-from nltk.tokenize import sent_tokenize
-from nltk.tokenize import word_tokenize
 from xml.etree import ElementTree
-
-import re
 
 
 def get_fileid_components(fileid):
