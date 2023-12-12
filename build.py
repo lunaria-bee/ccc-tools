@@ -167,6 +167,15 @@ def ast_contains(tree, node_type):
         )
 
 
+def is_python(s):
+    '''Can s be parsed as valid Python?'''
+    try:
+        ast.parse(s)
+        return True
+    except SyntaxError:
+        return False
+
+
 def is_comment_code(comment):
     '''Is `comment` just commented out code?
 
@@ -181,22 +190,15 @@ def is_comment_code(comment):
     '''
     trimmed_comment = trim_comment_as_code(comment)
 
-    try:
-        tree = ast.parse(trimmed_comment)
-
-        # Check if the comment, despite being valid code, is still something we want to
-        # interpret as English (alphanumeric strings optionally separated by operators).
-        if (
-                not set('()[]=.').intersection(set(trimmed_comment))
-                and 'return' not in trimmed_comment
-        ):
-            return False
-
-        # If all checks pass, is probably code.
-        return True
-
-    except SyntaxError:
-        return False
+    # Check if comment is valid code and contains parentheses, brackets, equals signs,
+    # periods, or the word 'return'.
+    return (
+        is_python(trimmed_comment)
+        and (
+            set('()[]=.').intersection(set(trimmed_comment))
+            or 'return' in trimmed_comment
+        )
+    )
 
 
 def _accumulate_comment_author_pairs_from_source_file(path, repo):
@@ -225,23 +227,16 @@ def _accumulate_comment_author_pairs_from_source_file(path, repo):
                     if last_line_with_comment != 0:
                         # Accumulate previous comment.
                         if is_comment_code(comment):
-                            try:
-                                ast.parse(trim_comment_as_code(comment))
-                                with open(BUILDNOTES_EXCLUDED_CODE_PATH, 'a') as f:
-                                    f.write(comment)
-                                    f.write(f"{'<>'*32}\n")
-                            except SyntaxError:
-                                pass
+                            with open(BUILDNOTES_EXCLUDED_CODE_PATH, 'a') as f:
+                                f.write(comment)
+                                f.write(f"{'<>'*32}\n")
                         else:
-                            try:
-                                ast.parse(trim_comment_as_code(comment))
+                            if is_python(trim_comment_as_code(comment)):
                                 with open(BUILDNOTES_INCLUDED_CODE_PATH, 'a') as f:
                                     f.write(comment)
                                     f.write(f"{'<>'*32}\n")
-                            except SyntaxError:
-                                pass
 
-                        comment_author_pairs.append(_CommentAuthorPair(comment, authors))
+                            comment_author_pairs.append(_CommentAuthorPair(comment, authors))
 
                     comment = f"{token.string}\n"
                     authors = set(
