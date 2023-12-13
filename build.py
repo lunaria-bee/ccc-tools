@@ -201,13 +201,14 @@ def is_comment_code(comment):
     )
 
 
-def _accumulate_comment_author_pairs_from_source_file(path, repo):
+def _accumulate_comments_from_source_file(path, repo):
     '''TODO'''
     comment = ""
     authors = set()
+    revs = set()
     last_line_had_comment = False
     first_comment_found = False
-    comment_author_pairs = []
+    comment_dicts = []
 
     blame_index = BlameIndex(repo, 'HEAD', path.relative_to(repo.dir))
     last_line_with_comment = 0 # tokenize functions index lines from 1
@@ -221,6 +222,7 @@ def _accumulate_comment_author_pairs_from_source_file(path, repo):
                     comment += f"{token.string}\n"
                     for blame in blame_index[token.start[0]:token.end[0]+1]:
                         authors.add(anonymize_id(blame.commit.author.name))
+                        revs.add(blame.commit.name_rev[:7])
 
                 else:
                     # New comment.
@@ -236,20 +238,28 @@ def _accumulate_comment_author_pairs_from_source_file(path, repo):
                                     f.write(comment)
                                     f.write(f"{'<>'*32}\n")
 
-                            comment_author_pairs.append(_CommentAuthorPair(comment, authors))
+                            comment_dicts.append({
+                                'comment': comment,
+                                'authors': authors,
+                                'revs': revs,
+                            })
 
                     comment = f"{token.string}\n"
                     authors = set(
                         anonymize_id(blame.commit.author.name)
                         for blame in blame_index[token.start[0]:token.end[0]+1]
                     )
+                    revs = set(
+                        blame.commit.name_rev[:7]
+                        for blame in blame_index[token.start[0]:token.end[0]+1]
+                    )
 
                 last_line_with_comment = token.end[0]
 
-    return comment_author_pairs
+    return comment_dicts
 
 
-def _create_note_subelement(parent, text, authors, note_type, repo):
+def _create_note_subelement(parent, text, authors, revisions, note_type, repo):
     '''TODO'''
     note_elt = ElementTree.SubElement(
         parent,
@@ -257,7 +267,7 @@ def _create_note_subelement(parent, text, authors, note_type, repo):
         attrib={
             'author': ','.join(authors), # TODO improve XML for multiple authors
             'repo': repo.name,
-            'revision': repo.rev,
+            'revision': ','.join(revisions), # TODO improve XML for multiple revisions
             'note-type': note_type,
         }
     )
@@ -289,10 +299,17 @@ def _create_repo_comments_xml_tree(repo):
     '''TODO'''
     root = ElementTree.Element('notes')
     for source_path in repo.dir.glob('**/*.py'):
-        comment_author_pairs = _accumulate_comment_author_pairs_from_source_file(source_path, repo)
+        comment_dicts = _accumulate_comments_from_source_file(source_path, repo)
 
-        for comment, authors in comment_author_pairs:
-            _create_note_subelement(root, comment, authors, NoteType.COMMENT, repo)
+        for d in comment_dicts:
+            _create_note_subelement(
+                root,
+                d['comment'],
+                d['authors'],
+                d['revs'],
+                NoteType.COMMENT,
+                repo
+            )
 
     return ElementTree.ElementTree(root)
 
@@ -334,6 +351,7 @@ def extract_data(force_reextract=()):
                         changelogs_root,
                         normalize_string(commit.message),
                         [anonymize_id(commit.author.name)],
+                        [commit.name_rev[:7]],
                         NoteType.CHANGELOG,
                         repo
                     )
