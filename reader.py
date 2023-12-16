@@ -63,7 +63,7 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         fileids = CategorizedCorpusReader.fileids(self, categories)
 
         if repos is not None:
-            repos = (repo.name if isinstance(repo, RepoManager) else repo for repo in repos)
+            repos = [repo.name if isinstance(repo, RepoManager) else repo for repo in repos]
             fileids = [fileid for fileid in fileids
                        if get_fileid_components(fileid)['repo'] in repos]
 
