@@ -6,6 +6,7 @@ from repo import RepoManager
 
 from nltk.corpus.reader.api import CategorizedCorpusReader
 from nltk.corpus.reader.xmldocs import XMLCorpusReader
+from timeit import timeit
 from xml.etree import ElementTree
 
 
@@ -68,6 +69,13 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
                        if get_fileid_components(fileid)['repo'] in repos]
 
         return fileids
+
+    def repos(self):
+        '''TODO'''
+        return set(
+            get_fileid_components(fileid)['repo']
+            for fileid in self.fileids()
+        )
 
     def xml(self, fileids=None, categories=None, repos=None):
         '''Get Python representation of corpus XML.
@@ -172,5 +180,139 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
                 word_pos_pairs.extend(zip(words, pos))
 
         return word_pos_pairs
+
+    def stats(self):
+        '''TODO'''
+        repos = self.repos()
+        categories = self.categories()
+
+        for repo in repos:
+            for cat in categories:
+                word_count = len(self.words(repos=[repo], categories=[cat]))
+                sent_count = len(self.sents(repos=[repo], categories=[cat]))
+                note_count = len(self.xml(repos=[repo], categories=[cat]))
+
+                print(f"{repo} {cat} words: {word_count}")
+                print(f"{repo} {cat} sents: {sent_count}")
+                print(f"{repo} {cat} notes: {note_count}")
+                print()
+
+            word_count = len(self.words(repos=[repo]))
+            sent_count = len(self.sents(repos=[repo]))
+            note_count = len(self.xml(repos=[repo]))
+
+            print(f"{repo} words: {word_count}")
+            print(f"{repo} sents: {sent_count}")
+            print(f"{repo} notes: {note_count}")
+            print()
+
+        for cat in categories:
+            word_count = len(self.words(categories=[cat]))
+            sent_count = len(self.sents(categories=[cat]))
+            note_count = len(self.xml(categories=[cat]))
+
+            print(f"{cat} words: {word_count}")
+            print(f"{cat} sents: {sent_count}")
+            print(f"{cat} notes: {note_count}")
+            print()
+
+        word_count = len(self.words())
+        sent_count = len(self.sents())
+        note_count = len(self.xml())
+
+        print(f"words: {word_count}")
+        print(f"sents: {sent_count}")
+        print(f"notes: {note_count}")
+
+    def performance(self, trials=100):
+        '''TODO'''
+        repos = self.repos()
+        categories = self.categories()
+
+        for repo in repos:
+            for cat in categories:
+                word_time = timeit(
+                    "self.words(repos=[repo], categories=[cat])",
+                    number=trials,
+                    globals=vars(),
+                ) / trials
+                sent_time = timeit(
+                    "self.sents(repos=[repo], categories=[cat])",
+                    number=trials,
+                    globals=vars(),
+                ) / trials
+                note_time = timeit(
+                    "self.xml(repos=[repo], categories=[cat])",
+                    number=trials,
+                    globals=vars(),
+                ) / trials
+
+                print(f"{repo} {cat} words: {word_time}")
+                print(f"{repo} {cat} sents: {sent_time}")
+                print(f"{repo} {cat} notes: {note_time}")
+                print()
+
+            word_time = timeit(
+                "self.words(repos=[repo])",
+                number=trials,
+                globals=vars(),
+            ) / trials
+            sent_time = timeit(
+                "self.sents(repos=[repo])",
+                number=trials,
+                globals=vars(),
+            ) / trials
+            note_time = timeit(
+                "self.xml(repos=[repo])",
+                number=trials,
+                globals=vars(),
+            ) / trials
+
+            print(f"{repo} words: {word_time}")
+            print(f"{repo} sents: {sent_time}")
+            print(f"{repo} notes: {note_time}")
+            print()
+
+        for cat in categories:
+            word_time = timeit(
+                "self.words(categories=[cat])",
+                number=trials,
+                globals=vars(),
+            ) / trials
+            sent_time = timeit(
+                "self.sents(categories=[cat])",
+                number=trials,
+                globals=vars(),
+            ) / trials
+            note_time = timeit(
+                "self.xml(categories=[cat])",
+                number=trials,
+                globals=vars(),
+            ) / trials
+
+            print(f"{cat} words: {word_time}")
+            print(f"{cat} sents: {sent_time}")
+            print(f"{cat} notes: {note_time}")
+            print()
+
+        word_time = timeit(
+            "self.words()",
+            number=trials,
+            globals=vars(),
+        ) / trials
+        sent_time = timeit(
+            "self.sents()",
+            number=trials,
+            globals=vars(),
+        ) / trials
+        note_time = timeit(
+            "self.xml()",
+            number=trials,
+            globals=vars(),
+        ) / trials
+
+        print(f"words: {word_time}")
+        print(f"sents: {sent_time}")
+        print(f"notes: {note_time}")
 
     # TODO override paras()
