@@ -22,6 +22,7 @@ from xml.etree import ElementTree
 
 import ast
 import collections
+import itertools as itr
 import logging
 import re
 import shutil
@@ -299,17 +300,21 @@ def _create_repo_comments_xml_tree(repo):
     '''TODO'''
     root = ElementTree.Element('notes')
     for source_path in repo.dir.glob('**/*.py'):
-        comment_dicts = _accumulate_comments_from_source_file(source_path, repo)
+        with open(source_path) as source_file:
+            is_valid_source = is_python(source_file.read())
 
-        for d in comment_dicts:
-            _create_note_subelement(
-                root,
-                d['comment'],
-                d['authors'],
-                d['revs'],
-                NoteType.COMMENT,
-                repo
-            )
+        if is_valid_source:
+            comment_dicts = _accumulate_comments_from_source_file(source_path, repo)
+
+            for d in comment_dicts:
+                _create_note_subelement(
+                    root,
+                    d['comment'],
+                    d['authors'],
+                    d['revs'],
+                    NoteType.COMMENT,
+                    repo
+                )
 
     return ElementTree.ElementTree(root)
 
