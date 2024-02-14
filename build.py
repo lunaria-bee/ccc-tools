@@ -2,11 +2,13 @@
 
 
 from defines import ConstructionStep
+from defines import Language
 from defines import NoteType
 from defines import BUILDNOTESDIR_PATH
 from defines import BUILDNOTES_INCLUDED_CODE_PATH
 from defines import BUILDNOTES_EXCLUDED_CODE_PATH
 from defines import CORPUSDIR_PATH
+from defines import LIBCLANG_HEADER_PATH
 from defines import REPOLIST_PATH
 from defines import REPODIR_PATH
 from repo import BlameIndex
@@ -21,6 +23,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 import ast
+import clang.cindex
 import collections
 import itertools as itr
 import logging
@@ -168,13 +171,80 @@ def ast_contains(tree, node_type):
         )
 
 
-def is_python(s):
-    '''Can s be parsed as valid Python?'''
-    try:
-        ast.parse(s)
-        return True
-    except SyntaxError:
-        return False
+def validate_source_text_language(text, language=None):
+    '''TODO
+
+    If `language` is `None` (default), try each supported language in turn.
+
+    '''
+    result = None
+
+    if language is None:
+        for l in language:
+            if validate_source_text_language(text, l):
+                result = l
+
+    elif language == Language.C:
+        pass # TODO
+
+    elif languagee == Language.CPP:
+        pass # TODO
+
+    elif language == Language.PYTHON:
+        try:
+            ast.parse(text)
+            result = language
+        except SyntaxError:
+            result = None
+
+    return result
+
+
+def validate_source_file_language(path, language=None):
+    '''TODO
+
+    If `language` is `None` (default), guess based on file extension.
+
+    '''
+    path = Path(path)
+
+    result = None
+
+    if language is None:
+        if path.suffix in ('.c', '.h'):
+            # Try C, then try C++.
+            result = validate_source_file_language(path, Language.C)
+            if not result:
+                result = validate_source_file_language(path, Language.CPP)
+
+        elif path.suffix in ('.cpp', '.cc', '.hpp', '.hh'):
+            result = validate_source_file_language(path, Language.CPP)
+
+        elif path.suffix == '.py':
+            result = validate_source_file_language(path, Language.PYTHON)
+
+    elif language in (Language.C, Language.CPP):
+        try:
+            index = clang.cindex.Index.create()
+            translation = index.parse(
+                path,
+                args=('--language', language, f'-I{LIBCLANG_HEADER_PATH}')
+            )
+            # Verify if no parse issues (parse issues are Clang diagnostic category 4).
+            if all(
+                    diagnostic.category_number != 4
+                    for diagnostic in translation.diagnostics
+            ):
+                result = language
+
+        except clang.cindex.TranslationUniteLoadError:
+            result = None
+
+    elif language == Language.PYTHON:
+        with open(path) as source_file:
+            result = validate_source_text_language(source_file.read(), language)
+
+    return result
 
 
 def is_comment_code(comment):
@@ -194,7 +264,7 @@ def is_comment_code(comment):
     # Check if comment is valid code and contains parentheses, brackets, equals signs,
     # periods, or the word 'return'.
     return (
-        is_python(trimmed_comment)
+        validate_source_text_language(trimmed_comment, Language.PYTHON)
         and (
             set('()[]=.').intersection(set(trimmed_comment))
             or 'return' in trimmed_comment
@@ -234,7 +304,7 @@ def _accumulate_comments_from_source_file(path, repo):
                                 f.write(comment)
                                 f.write(f"{'<>'*32}\n")
                         else:
-                            if is_python(trim_comment_as_code(comment)):
+                            if validate_source_text_language(trim_comment_as_code(comment), Language.PYTHON):
                                 with open(BUILDNOTES_INCLUDED_CODE_PATH, 'a') as f:
                                     f.write(comment)
                                     f.write(f"{'<>'*32}\n")
@@ -300,10 +370,9 @@ def _create_repo_comments_xml_tree(repo):
     '''TODO'''
     root = ElementTree.Element('notes')
     for source_path in repo.dir.glob('**/*.py'):
-        with open(source_path) as source_file:
-            is_valid_source = is_python(source_file.read())
+        language = validate_source_file_language(source_path)
 
-        if is_valid_source:
+        if language:
             comment_dicts = _accumulate_comments_from_source_file(source_path, repo)
 
             for d in comment_dicts:

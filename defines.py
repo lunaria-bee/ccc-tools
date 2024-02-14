@@ -1,6 +1,7 @@
 '''Commonly-used type and value definitions.'''
 
 
+from enum import Enum
 from enum import IntEnum
 from enum import StrEnum
 from pathlib import Path
@@ -13,6 +14,8 @@ REPOLIST_PATH = Path('./repolist.txt')
 
 REPODIR_PATH = Path('./repos')
 '''Path to the directory where code repositories are stored.'''
+
+LIBCLANG_HEADER_PATH = Path('/usr/lib64/clang/16/include')
 
 CORPUSDIR_PATH = Path('./corpus')
 '''Path to the directory where corpus data is stored.'''
@@ -52,6 +55,13 @@ class ConstructionStep(IntEnum):
             'annotate': cls.ANNOTATE,
             'end': cls.END,
         }[s.lower()]
+
+
+class Language(StrEnum):
+    '''TODO'''
+    C = 'c'
+    CPP = 'c++'
+    PYTHON = 'python'
 
 
 class NoteType(StrEnum):
