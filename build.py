@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 
+# TODO clean up imports
+
 from defines import ConstructionStep
 from defines import Language
 from defines import NoteType
