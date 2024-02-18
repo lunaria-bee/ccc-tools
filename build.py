@@ -55,7 +55,16 @@ parser.add_argument(
     choices=('download', 'extract', 'annotate'),
     help=(
         "Partially rebuild corpus beginning from a particular step."
-        + " Not currently implemented for 'extract' or 'annotate'."
+        " Not currently implemented for 'extract' or 'annotate'."
+    ),
+)
+
+parser.add_argument(
+    '--note-types',
+    choices=tuple(NoteType),
+    nargs='+',
+    help=(
+        "Only process selected note types."
     ),
 )
 
@@ -538,6 +547,7 @@ def main(argv):
     enable_debug_output = False
     enable_logging = True
     redo_level = ConstructionStep.END
+    note_types = tuple(NoteType)
 
     if args.v:
         log_level = logging.DEBUG
@@ -558,6 +568,9 @@ def main(argv):
     if args.redo:
         redo_level = ConstructionStep.START
 
+    if args.note_types:
+        note_types = args.note_types
+
     # Setup logging.
     if enable_logging:
         handler = logging.StreamHandler()
@@ -575,13 +588,11 @@ def main(argv):
 
     # Extract.
     if redo_level <= ConstructionStep.EXTRACT:
-        redo_note_types = tuple(NoteType)
+        redo_note_types = note_types
     else:
         redo_note_types = tuple()
 
     extract_data(force_reextract=redo_note_types)
-
-    # TODO Annotate.
 
 
 if __name__== '__main__': main(sys.argv[1:])
