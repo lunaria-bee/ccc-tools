@@ -39,7 +39,11 @@ class RepoManager:
             repolist = [
                 RepoManager(url, rev)
                 for url, rev
-                in [line.strip().split(',') for line in repolist_file.readlines()]
+                in [
+                    line.strip().split(',')
+                    for line in repolist_file.readlines()
+                    if not line.startswith('#')
+                ]
             ]
 
         return repolist

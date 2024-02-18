@@ -1,5 +1,8 @@
-https://github.com/django/django.git,0d5e9a3
+#https://github.com/django/django.git,0d5e9a3
 https://github.com/pallets/flask.git,708d62d
-https://github.com/kivy/kivy.git,33f0a03
-https://github.com/coleifer/peewee.git,ea3fb11
-https://github.com/wrye-bash/wrye-bash.git,e25f924
+https://github.com/mariusae/heapster.git,26b29ff
+#https://github.com/ImageMagick/ImageMagick.git,bc11c2a
+#https://github.com/kivy/kivy.git,33f0a03
+#https://github.com/coleifer/peewee.git,ea3fb11
+https://github.com/apiaryio/snowcrash.git,b5b39fa
+#https://github.com/wrye-bash/wrye-bash.git,e25f924

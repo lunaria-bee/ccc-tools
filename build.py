@@ -17,6 +17,7 @@ from repo import BlameIndex
 from repo import RepoManager
 
 from argparse import ArgumentParser
+from collections import namedtuple
 from hashlib import sha256 as anon_hash
 from nltk.tag import pos_tag
 from nltk.tokenize import sent_tokenize
@@ -26,7 +27,6 @@ from xml.etree import ElementTree
 
 import ast
 import clang.cindex
-import collections
 import itertools as itr
 import logging
 import re
@@ -38,7 +38,8 @@ import tokenize
 # TODO precompile regexes
 
 
-_CommentAuthorPair = collections.namedtuple('_CommentAuthorPair', ('comment', 'authors'))
+_CommentAuthorPair = namedtuple('_CommentAuthorPair', ('comment', 'authors'))
+_TextPos = namedtuple('_TextPos', ('line', 'column'))
 
 
 parser = ArgumentParser()
@@ -127,21 +128,29 @@ def download_repos(force_redownload=False):
     logging.info("Finished retrieving repos.")
 
 
-def strip_comment_delimiters(comment):
+def strip_comment_delimiters(comment, language):
     '''TODO'''
-    return "\n".join(
-        line.lstrip('#') for line in comment.split('\n')
-    )
+    if language in (Language.C, Language.CPP):
+        # TODO strip excess '*'
+        # TODO more intelligent stripping for multiline-style comments ("/*...*/")
+        return "\n".join(
+            line.lstrip('//').lstrip('/*').rstrip('*/') for line in comment.split('\n')
+        )
+
+    elif language==Language.PYTHON:
+        return "\n".join(
+            line.lstrip('#') for line in comment.split('\n')
+        )
 
 
-def trim_comment_as_code(comment):
+def trim_comment_as_code(comment, language):
     '''Trim comment delimiters and leading whitespace, preserving indentation.
 
     For this function to work, indentations *cannot* mix tabs and spaces.
 
     '''
     # Remove comment delimiters
-    comment = strip_comment_delimiters(comment)
+    comment = strip_comment_delimiters(comment, language)
 
     # Find amount of whitespace to remove. Result is smallest number of leading
     # spaces/tabs on a line.
@@ -182,14 +191,14 @@ def validate_source_text_language(text, language=None):
     result = None
 
     if language is None:
-        for l in language:
+        for l in Language:
             if validate_source_text_language(text, l):
                 result = l
 
     elif language == Language.C:
         pass # TODO
 
-    elif languagee == Language.CPP:
+    elif language == Language.CPP:
         pass # TODO
 
     elif language == Language.PYTHON:
@@ -249,7 +258,7 @@ def validate_source_file_language(path, language=None):
     return result
 
 
-def is_comment_code(comment):
+def is_comment_code(comment, language):
     '''Is `comment` just commented out code?
 
     This function does not simply check whether the comment is syntactically valid
@@ -261,20 +270,76 @@ def is_comment_code(comment):
     - ...*not* contain the text "return"
 
     '''
-    trimmed_comment = trim_comment_as_code(comment)
+    if language in (Language.C, Language.CPP):
+        return False # TODO commented-out C/C++ code
 
-    # Check if comment is valid code and contains parentheses, brackets, equals signs,
-    # periods, or the word 'return'.
-    return (
-        validate_source_text_language(trimmed_comment, Language.PYTHON)
-        and (
-            set('()[]=.').intersection(set(trimmed_comment))
-            or 'return' in trimmed_comment
+    elif language == Language.PYTHON:
+        trimmed_comment = trim_comment_as_code(comment, language)
+        # Check if comment is valid code and contains parentheses, brackets, equals signs,
+        # periods, or the word 'return'.
+        return (
+            validate_source_text_language(trimmed_comment, Language.PYTHON)
+            and (
+                set('()[]=.').intersection(set(trimmed_comment))
+                or 'return' in trimmed_comment
+            )
         )
-    )
 
 
-def _accumulate_comments_from_source_file(path, repo):
+def _get_comment_tokens_from_source_file(path, language):
+    '''TODO'''
+    if language in (Language.C, Language.CPP):
+        index = clang.cindex.Index.create()
+        translation = index.parse(
+            path,
+            args=('--language', language, f'-I{LIBCLANG_HEADER_PATH}'),
+        )
+        tokens = [
+            token for token in translation.cursor.get_tokens()
+            if token.kind == clang.cindex.TokenKind.COMMENT
+        ]
+
+    elif language == Language.PYTHON:
+        with tokenize.open(path) as source_file:
+            tokens = [
+                token for token in tokenize.generate_tokens(source_file.readline)
+                if token.type == tokenize.COMMENT
+            ]
+
+    return tokens
+
+
+def _get_token_span(token, language):
+    '''TODO'''
+    if language in (Language.C, Language.CPP):
+        start = _TextPos(token.extent.start.line, token.extent.start.column)
+        end = _TextPos(token.extent.end.line, token.extent.end.column)
+
+    elif language == Language.PYTHON:
+        start = _TextPos(token.start[0], token.start[1])
+        end = _TextPos(token.end[0], token.end[1])
+
+    else:
+        raise ValueError(f"`language` must be one of {{{','.join(Language)}}}, not {language}")
+
+    return start, end
+
+
+def _get_token_text(token, language):
+    '''TODO'''
+    if language in (Language.C, Language.CPP):
+        text = token.spelling
+
+    elif language == Language.PYTHON:
+        text = token.string
+
+    else:
+        raise ValueError(f"`language` must be one of {{{','.join(Language)}}}, not {language}")
+
+    return text
+
+
+def _accumulate_comments_from_source_file(path, repo, language):
     '''TODO'''
     comment = ""
     authors = set()
@@ -286,54 +351,56 @@ def _accumulate_comments_from_source_file(path, repo):
     blame_index = BlameIndex(repo, 'HEAD', path.relative_to(repo.dir))
     last_line_with_comment = 0 # tokenize functions index lines from 1
 
-    with tokenize.open(path) as source_file:
-        for token in tokenize.generate_tokens(source_file.readline):
-            if token.type == tokenize.COMMENT:
+    for token in _get_comment_tokens_from_source_file(path, language):
+        token_start, token_end = _get_token_span(token, language)
 
-                if last_line_with_comment == token.start[0]-1:
-                    # Continuation of previous comment.
-                    comment += f"{token.string}\n"
-                    for blame in blame_index[token.start[0]:token.end[0]+1]:
-                        authors.add(anonymize_id(blame.commit.author.name))
-                        revs.add(blame.commit.name_rev[:7])
+        if last_line_with_comment == token_start.line-1:
+            # Continuation of previous comment.
+            comment += f"{_get_token_text(token, language)}\n"
+            for blame in blame_index[token_start.line:token_end.line+1]:
+                authors.add(anonymize_id(blame.commit.author.name))
+                revs.add(blame.commit.name_rev[:7])
 
+        else:
+            # New comment.
+            if last_line_with_comment != 0:
+                # Accumulate previous comment.
+                if is_comment_code(comment, language):
+                    with open(BUILDNOTES_EXCLUDED_CODE_PATH, 'a') as f:
+                        f.write(comment)
+                        f.write(f"{'<>'*32}\n")
                 else:
-                    # New comment.
-                    if last_line_with_comment != 0:
-                        # Accumulate previous comment.
-                        if is_comment_code(comment):
-                            with open(BUILDNOTES_EXCLUDED_CODE_PATH, 'a') as f:
-                                f.write(comment)
-                                f.write(f"{'<>'*32}\n")
-                        else:
-                            if validate_source_text_language(trim_comment_as_code(comment), Language.PYTHON):
-                                with open(BUILDNOTES_INCLUDED_CODE_PATH, 'a') as f:
-                                    f.write(comment)
-                                    f.write(f"{'<>'*32}\n")
+                    if validate_source_text_language(trim_comment_as_code(comment, language)):
+                        with open(BUILDNOTES_INCLUDED_CODE_PATH, 'a') as f:
+                            f.write(comment)
+                            f.write(f"{'<>'*32}\n")
 
-                            comment_dicts.append({
-                                'comment': comment,
-                                'authors': authors,
-                                'revs': revs,
-                            })
+                    comment_dicts.append({
+                        'comment': comment,
+                        'authors': authors,
+                        'revs': revs,
+                    })
 
-                    comment = f"{token.string}\n"
-                    authors = set(
-                        anonymize_id(blame.commit.author.name)
-                        for blame in blame_index[token.start[0]:token.end[0]+1]
-                    )
-                    revs = set(
-                        blame.commit.name_rev[:7]
-                        for blame in blame_index[token.start[0]:token.end[0]+1]
-                    )
+            comment = f"{_get_token_text(token, language)}\n"
+            authors = set(
+                anonymize_id(blame.commit.author.name)
+                for blame in blame_index[token_start.line:token_end.line+1]
+            )
+            revs = set(
+                blame.commit.name_rev[:7]
+                for blame in blame_index[token_start.line:token_end.line+1]
+            )
 
-                last_line_with_comment = token.end[0]
+        last_line_with_comment = token_end.line
 
     return comment_dicts
 
 
-def _create_note_subelement(parent, text, authors, revisions, note_type, repo):
+def _create_note_subelement(parent, text, authors, revisions, note_type, repo, language=None):
     '''TODO'''
+    if note_type == NoteType.COMMENT and language is None:
+        raise ValueError(f"`language` cannot be `None` when `note_type` is `COMMENT`")
+
     note_elt = ElementTree.SubElement(
         parent,
         'note',
@@ -351,7 +418,7 @@ def _create_note_subelement(parent, text, authors, revisions, note_type, repo):
 
     # Tokenize text. Strip delimiters from comments.
     if note_type == NoteType.COMMENT:
-        stripped_text = strip_comment_delimiters(text)
+        stripped_text = strip_comment_delimiters(text, language)
         sents = [word_tokenize(sent) for sent in sent_tokenize(stripped_text)]
     else:
         sents = [word_tokenize(sent) for sent in sent_tokenize(text)]
@@ -371,11 +438,11 @@ def _create_note_subelement(parent, text, authors, revisions, note_type, repo):
 def _create_repo_comments_xml_tree(repo):
     '''TODO'''
     root = ElementTree.Element('notes')
-    for source_path in repo.dir.glob('**/*.py'):
+    for source_path in repo.dir.glob('**/*'):
         language = validate_source_file_language(source_path)
 
         if language:
-            comment_dicts = _accumulate_comments_from_source_file(source_path, repo)
+            comment_dicts = _accumulate_comments_from_source_file(source_path, repo, language)
 
             for d in comment_dicts:
                 _create_note_subelement(
@@ -384,7 +451,8 @@ def _create_repo_comments_xml_tree(repo):
                     d['authors'],
                     d['revs'],
                     NoteType.COMMENT,
-                    repo
+                    repo,
+                    language,
                 )
 
     return ElementTree.ElementTree(root)
