@@ -408,18 +408,31 @@ def _accumulate_comments_from_source_file(path, repo, language):
 def _create_note_subelement(parent, text, authors, revisions, note_type, repo, language=None):
     '''TODO'''
     if note_type == NoteType.COMMENT and language is None:
-        raise ValueError(f"`language` cannot be `None` when `note_type` is `COMMENT`")
+        raise ValueError(f"`language` cannot be `None` when `note_type` is `{NoteType.COMMENT}`")
 
     note_elt = ElementTree.SubElement(
         parent,
         'note',
-        attrib={
-            'author': ','.join(authors), # TODO improve XML for multiple authors
-            'repo': repo.name,
-            'revision': ','.join(revisions), # TODO improve XML for multiple revisions
-            'note-type': note_type,
-        }
     )
+
+    # XML element(s) for author(s).
+    for author in authors:
+        author_elt = ElementTree.SubElement(note_elt, 'author')
+        author_elt.text = author
+
+    # XML element(s) for revision(s).
+    for rev in revisions:
+        rev_elt = ElementTree.SubElement(note_elt, 'revision')
+        rev_elt.text = rev
+
+    # XML element for note type.
+    note_type_elt = ElementTree.SubElement(note_elt, 'note-type')
+    note_type.text = note_type
+
+    # XML element for language.
+    if language is not None:
+        language_elt = ElementTree.SubElement(note_elt, 'language')
+        language_elt.text = language
 
     # XML element for raw text.
     raw_elt = ElementTree.SubElement(note_elt, 'raw')
