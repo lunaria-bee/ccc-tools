@@ -69,9 +69,8 @@ class NoteType(StrEnum):
 
     CHANGELOG
     COMMENT
-    DOCUMENTATION
 
     '''
     CHANGELOG = 'changelog'
     COMMENT = 'comment'
-    DOCUMENTATION = 'documentation'
+    # DOCUMENTATION = 'documentation'
