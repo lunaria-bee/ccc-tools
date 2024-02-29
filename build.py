@@ -1,7 +1,24 @@
 #!/usr/bin/env python3
 
 
-# TODO clean up imports
+from argparse import ArgumentParser
+import ast
+from collections import namedtuple
+from hashlib import sha256 as anon_hash
+import itertools as itr
+import logging
+from pathlib import Path
+import re
+import shutil
+import sys
+import tokenize
+from xml.etree import ElementTree
+
+import clang.cindex
+
+from nltk.tag import pos_tag
+from nltk.tokenize import sent_tokenize
+from nltk.tokenize import word_tokenize
 
 from defines import ConstructionStep
 from defines import Language
@@ -15,24 +32,6 @@ from defines import REPOLIST_PATH
 from defines import REPODIR_PATH
 from repo import BlameIndex
 from repo import RepoManager
-
-from argparse import ArgumentParser
-from collections import namedtuple
-from hashlib import sha256 as anon_hash
-from nltk.tag import pos_tag
-from nltk.tokenize import sent_tokenize
-from nltk.tokenize import word_tokenize
-from pathlib import Path
-from xml.etree import ElementTree
-
-import ast
-import clang.cindex
-import itertools as itr
-import logging
-import re
-import shutil
-import sys
-import tokenize
 
 
 # TODO precompile regexes
