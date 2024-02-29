@@ -110,6 +110,10 @@ parser.add_argument(
 )
 
 
+class TokenizationError(Exception):
+    pass
+
+
 def normalize_string(s):
     '''Correct irregularities in string content.'''
     # Strip bell character (unicode x07) from string.
@@ -337,7 +341,10 @@ def _get_token_span(token, language):
 def _get_token_text(token, language):
     '''TODO'''
     if language in (Language.C, Language.CPP):
-        text = token.spelling
+        try:
+            text = token.spelling
+        except UnicodeDecodeError:
+            raise TokenizationError()
 
     elif language == Language.PYTHON:
         text = token.string
@@ -353,6 +360,8 @@ def _accumulate_comments_from_source_file(path, repo, language):
     comment = ""
     authors = set()
     revs = set()
+    first_line = 0
+    last_line = 0
     last_line_had_comment = False
     first_comment_found = False
     comment_dicts = []
@@ -369,6 +378,7 @@ def _accumulate_comments_from_source_file(path, repo, language):
             for blame in blame_index[token_start.line:token_end.line+1]:
                 authors.add(anonymize_id(blame.commit.author.name))
                 revs.add(blame.commit.name_rev[:7])
+            last_line = token_end.line
 
         else:
             # New comment.
@@ -388,6 +398,9 @@ def _accumulate_comments_from_source_file(path, repo, language):
                         'comment': comment,
                         'authors': authors,
                         'revs': revs,
+                        'path': path,
+                        'first-line': first_line,
+                        'last-line': last_line,
                     })
 
             comment = f"{_get_token_text(token, language)}\n"
@@ -399,21 +412,40 @@ def _accumulate_comments_from_source_file(path, repo, language):
                 blame.commit.name_rev[:7]
                 for blame in blame_index[token_start.line:token_end.line+1]
             )
+            first_line = token_start.line
 
         last_line_with_comment = token_end.line
 
     return comment_dicts
 
 
-def _create_note_subelement(parent, text, authors, revisions, note_type, repo, language=None):
+def _create_note_subelement(
+        parent,
+        text,
+        authors,
+        revisions,
+        note_type,
+        repo,
+        path=None,
+        first_line=None,
+        last_line=None,
+        language=None,
+):
     '''TODO'''
     if note_type == NoteType.COMMENT and language is None:
         raise ValueError(f"`language` cannot be `None` when `note_type` is `{NoteType.COMMENT}`")
+
+    if note_type == NoteType.COMMENT and (first_line is None or last_line is None):
+        raise ValueError(f"first_line and last_line cannot be `None` when `note_type` is `{NoteType.COMMENT}`")
 
     note_elt = ElementTree.SubElement(
         parent,
         'note',
     )
+
+    # XML element for repo.
+    repo_elt = ElementTree.SubElement(note_elt, 'repo')
+    repo_elt.text = str(repo)
 
     # XML element(s) for author(s).
     for author in authors:
@@ -427,7 +459,21 @@ def _create_note_subelement(parent, text, authors, revisions, note_type, repo, l
 
     # XML element for note type.
     note_type_elt = ElementTree.SubElement(note_elt, 'note-type')
-    note_type.text = note_type
+    note_type_elt.text = str(note_type)
+
+    # XML element for file.
+    if path is not None:
+        file_elt = ElementTree.SubElement(note_elt, 'file')
+        file_elt.text = str(path)
+
+    # XML elements for first line and last line.
+    if first_line is not None:
+        first_line_elt = ElementTree.SubElement(note_elt, 'first-line')
+        first_line_elt.text = str(first_line)
+
+    if last_line is not None:
+        last_line_elt = ElementTree.SubElement(note_elt, 'last-line')
+        last_line_elt.text = str(last_line)
 
     # XML element for language.
     if language is not None:
@@ -464,18 +510,25 @@ def _create_repo_comments_xml_tree(repo):
         language = validate_source_file_language(source_path)
 
         if language:
-            comment_dicts = _accumulate_comments_from_source_file(source_path, repo, language)
+            try:
+                comment_dicts = _accumulate_comments_from_source_file(source_path, repo, language)
+                for d in comment_dicts:
+                    _create_note_subelement(
+                        root,
+                        d['comment'],
+                        d['authors'],
+                        d['revs'],
+                        NoteType.COMMENT,
+                        repo,
+                        d['path'],
+                        d['first-line'],
+                        d['last-line'],
+                        language,
+                    )
 
-            for d in comment_dicts:
-                _create_note_subelement(
-                    root,
-                    d['comment'],
-                    d['authors'],
-                    d['revs'],
-                    NoteType.COMMENT,
-                    repo,
-                    language,
-                )
+            # Don't extract comments for file that we cannot read.
+            except TokenizationError:
+                continue
 
     return ElementTree.ElementTree(root)
 
