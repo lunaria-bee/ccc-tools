@@ -58,19 +58,14 @@ class ConstructionStep(IntEnum):
 
 
 class Language(StrEnum):
-    '''TODO'''
+    '''Supported programming languages.'''
     C = 'c'
     CPP = 'c++'
     PYTHON = 'python'
 
 
 class NoteType(StrEnum):
-    '''Types of source code annotations.
-
-    CHANGELOG
-    COMMENT
-
-    '''
+    '''Types of source code annotations.'''
     CHANGELOG = 'changelog'
     COMMENT = 'comment'
     # DOCUMENTATION = 'documentation'

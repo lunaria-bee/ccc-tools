@@ -137,7 +137,7 @@ class RepoManager:
 
 
 class _BlameIndexEntry:
-    '''TODO'''
+    '''Unused'''
 
     def __init__(self, commit, line):
         self._commit = commit
@@ -153,11 +153,10 @@ class _BlameIndexEntry:
 
 
 _BlameIndexEntry = collections.namedtuple('_BlameIndexEntry', ('commit', 'line'))
-'''TODO'''
 
 
 class BlameIndex:
-    '''TODO'''
+    '''Lookup table mapping (line number -> blame data) for a source file.'''
 
     def __init__(self, repo, rev, path):
         self._raw_blame = repo.git.blame(rev, path)
@@ -195,20 +194,20 @@ class BlameIndex:
 
     @property
     def raw_blame(self):
-        '''TODO'''
+        '''Raw blame data for the source file.'''
         return self._raw_blame
 
     @property
     def repo(self):
-        '''TODO'''
+        '''Repo containing the source file.'''
         return self._repo
 
     @property
     def rev(self):
-        '''TODO'''
+        '''Last revision in repository'''
         return self._rev
 
     @property
     def path(self):
-        '''TODO'''
+        '''Path to source file.'''
         return self._path

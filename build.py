@@ -142,7 +142,12 @@ def download_repos(force_redownload=False):
 
 
 def strip_comment_delimiters(comment, language):
-    '''TODO'''
+    '''Remove comment delimiters from `comment`.
+
+    `language` parameter is used to determine what comment delimiters will look like and
+    how to remove them.
+
+    '''
     if language in (Language.C, Language.CPP):
         # TODO strip excess '*'
         # TODO more intelligent stripping for multiline-style comments ("/*...*/")
@@ -196,9 +201,14 @@ def ast_contains(tree, node_type):
 
 
 def validate_source_text_language(text, language=None):
-    '''TODO
+    '''Determine whether `text` is valid code in some programming language.
 
-    If `language` is `None` (default), try each supported language in turn.
+    `text`: Text to validate.
+    `language`: Language enum value of language to check `text` against. If `language` is
+                `None` (default), try each supported language in turn.
+
+    Return: Language enum value representing programming language `text` belongs to, or
+            `None`.
 
     '''
     result = None
@@ -225,9 +235,15 @@ def validate_source_text_language(text, language=None):
 
 
 def validate_source_file_language(path, language=None):
-    '''TODO
+    '''Determine whether the contents of the file at `path` is valid code in some
+    programming language.
 
-    If `language` is `None` (default), guess based on file extension.
+    `path`: Path to file to validate.
+    `language`: Language enum value of language to check `text` against. If `language` is
+                `None` (default), guess based on file extension.
+
+    Return: Language enum value representing programming language the contents of the file
+            at `path` belongs to, or `None`.
 
     '''
     path = Path(path)
@@ -300,7 +316,15 @@ def is_comment_code(comment, language):
 
 
 def _get_comment_tokens_from_source_file(path, language):
-    '''TODO'''
+    '''Retrieve all comment tokens from a file.
+
+    `path`: Path to file to extract comments from.
+    `language`: Programming language of the file at `path`.
+
+    Return: List of token objects. The structure of these objects will depend on the
+            programming language that was parsed.
+
+    '''
     if language in (Language.C, Language.CPP):
         index = clang.cindex.Index.create()
         translation = index.parse(
@@ -323,7 +347,15 @@ def _get_comment_tokens_from_source_file(path, language):
 
 
 def _get_token_span(token, language):
-    '''TODO'''
+    '''Get start and end positions of a token.
+
+    `token`: Token object returned by `_get_commment_tokens_from_source_file()`.
+    `language`: Langauge enum value of the programming language the token came from.
+
+    Return: Pair of _TextPos named tuples, the first of which is represents the start of
+            the span, the second of which represents the end of the span.
+
+    '''
     if language in (Language.C, Language.CPP):
         start = _TextPos(token.extent.start.line, token.extent.start.column)
         end = _TextPos(token.extent.end.line, token.extent.end.column)
@@ -339,7 +371,14 @@ def _get_token_span(token, language):
 
 
 def _get_token_text(token, language):
-    '''TODO'''
+    '''Get the text associated with a token object.
+
+    `token`: Token object returned by `_get_commment_tokens_from_source_file()`.
+    `language`: Langauge enum value of the programming language the token came from.
+
+    Return: String containing token text.
+
+    '''
     if language in (Language.C, Language.CPP):
         try:
             text = token.spelling
@@ -356,7 +395,23 @@ def _get_token_text(token, language):
 
 
 def _accumulate_comments_from_source_file(path, repo, language):
-    '''TODO'''
+    '''Get all comments from a programming source file.
+
+    `path`: Path to file.
+    `repo`: RepoManager object associated with source file's repository.
+    `language`: Programming language associated with file.
+
+    Return: List of dicts where each dict corresponds to a single comment, with the
+            following keys:
+            - 'comment': Text of the comment.
+            - 'authors': List of anonymized author IDs, retrieved from repository blame
+                         data.
+            - 'revs': List of revision IDs, retrieved from repository blame data.
+            - 'path': Path to file. Same as `path` argument.
+            - 'first-line': First line the comment appears on in the file.
+            - 'last-line': Last line the comment appears on in the file.
+
+    '''
     comment = ""
     authors = set()
     revs = set()
@@ -431,7 +486,26 @@ def _create_note_subelement(
         last_line=None,
         language=None,
 ):
-    '''TODO'''
+    '''Create an XML subelement representing a source annotation.
+
+    `parent`: Parent XML element. Should be the root <notes> element of a corpus file.
+    `text`: Text of the annotation.
+    `authors`: List of authors of the annotation.
+    `revisions`: List of revisions in which the annotation was made.
+    `note_type`: NoteType enum value representing annotation type.
+    `repo`: Either a RepoManager object representing the repository the annotation came
+            from, or simply the name of the repository the annotation came from.
+    `path`: Path to the file the annotation came from. Only relevant for comments.
+    `first_line`: First line of the file on which the annotation appears. Only relevant
+                  for comments.
+    `last_line`: Last line of the file on which the annotation appears. Only relevant for
+                 comments.
+    `language`: Language enum value representing the programming language this annotation
+                annotated.
+
+    Return: Corpus-ready ElementTree.SubElement object.
+
+    '''
     if note_type == NoteType.COMMENT and language is None:
         raise ValueError(f"`language` cannot be `None` when `note_type` is `{NoteType.COMMENT}`")
 
@@ -504,7 +578,13 @@ def _create_note_subelement(
 
 
 def _create_repo_comments_xml_tree(repo):
-    '''TODO'''
+    '''Extract comments from a repository and build an XML tree to contain them.
+
+    `repo`: RepoManager object.
+
+    Return: Corpus-ready ElementTree.ElementTree object
+
+    '''
     root = ElementTree.Element('notes')
     for source_path in repo.dir.glob('**/*'):
         language = validate_source_file_language(source_path)

@@ -1,4 +1,4 @@
-'''TODO'''
+'''NLTK reader for Code Comment Corpus.'''
 
 
 from defines import NoteType
@@ -11,7 +11,15 @@ from xml.etree import ElementTree
 
 
 def get_fileid_components(fileid):
-    '''TODO'''
+    '''Split a corpus fileid into its semantic components.
+
+    Return: Python dict of:
+            - 'note-type': NoteType enum value of what type of annotations the file
+                           contains.
+            - 'repo': Name of the repository the file's data came from, as a string.
+            - 'extension': Extension of the file. Will generally be "xml".    
+
+    '''
     components = fileid.split('.')
     return {
         'note-type': NoteType(components[0]),
@@ -21,7 +29,7 @@ def get_fileid_components(fileid):
 
 
 class CccReader(CategorizedCorpusReader, XMLCorpusReader):
-    '''TODO'''
+    '''Reader class for Code Comment Corpus.'''
 
     def __init__(self):
         root = 'corpus'
@@ -71,7 +79,7 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         return fileids
 
     def repos(self):
-        '''TODO'''
+        '''Get list of repositories corpus data was extracted from.'''
         return set(
             get_fileid_components(fileid)['repo']
             for fileid in self.fileids()
@@ -169,7 +177,21 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         return sents
 
     def pos(self, fileids=None, categories=None, repos=None):
-        '''TODO'''
+        '''Get pairs of the form (word, part-of-speech tag).
+
+        May optionally filter to a subcorpus using the fileids, categories, and repos
+        arguments. If more than one of these parameters is set, only select fileids that
+        satisfy all provided criteria.
+
+        `fileids`: List of fileids.
+        `categories`: List of note cateogires (see defines.NoteType).
+        `repos`: List of repositories. Each element may be either the repository name as a
+               string, or a RepoManager object. The list may contain a mixture of both.
+
+        Return: List of tuples, where each tuple is a pair of the form
+                (word, part-of-speech tag).
+
+        '''
         xml = self.xml(fileids, categories, repos)
 
         word_pos_pairs = []
@@ -182,7 +204,7 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         return word_pos_pairs
 
     def stats(self):
-        '''TODO'''
+        '''Print statistics about the size of the corpus and sub-corpora.'''
         repos = self.repos()
         categories = self.categories()
 
@@ -225,7 +247,7 @@ class CccReader(CategorizedCorpusReader, XMLCorpusReader):
         print(f"notes: {note_count}")
 
     def performance(self, trials=100):
-        '''TODO'''
+        '''Print perfomance statistics for CccReader methods.'''
         repos = self.repos()
         categories = self.categories()
 
