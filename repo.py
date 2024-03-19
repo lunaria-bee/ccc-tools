@@ -136,22 +136,6 @@ class RepoManager:
         return self._git_cmd
 
 
-class _BlameIndexEntry:
-    '''Unused'''
-
-    def __init__(self, commit, line):
-        self._commit = commit
-        self._line = line
-
-    @property
-    def commit(self):
-        return self._commit
-
-    @property
-    def line(self):
-        return self._line
-
-
 _BlameIndexEntry = collections.namedtuple('_BlameIndexEntry', ('commit', 'line'))
 
 
