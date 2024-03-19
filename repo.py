@@ -136,11 +136,10 @@ class RepoManager:
         return self._git_cmd
 
 
-_BlameIndexEntry = collections.namedtuple('_BlameIndexEntry', ('commit', 'line'))
-
-
 class BlameIndex:
     '''Lookup table mapping (line number -> blame data) for a source file.'''
+
+    _Entry = collections.namedtuple('_BlameIndexEntry', ('commit', 'line'))
 
     def __init__(self, repo, rev, path):
         self._raw_blame = repo.git.blame(rev, path)
@@ -151,7 +150,7 @@ class BlameIndex:
         self._index = []
         for commit, lines in self._raw_blame:
             for line in lines:
-                self._index.append(_BlameIndexEntry(commit, line))
+                self._index.append(BlameIndex._Entry(commit, line))
 
     def __len__(self):
         return len(self._index)
