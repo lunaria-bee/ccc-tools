@@ -55,7 +55,7 @@ parser.add_argument(
     choices=('download', 'extract', 'annotate'),
     help=(
         "Partially rebuild corpus beginning from a particular step."
-        " Not currently implemented for 'extract' or 'annotate'."
+        " Not currently implemented for 'annotate'."
     ),
 )
 
