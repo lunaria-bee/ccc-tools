@@ -17,18 +17,22 @@ from repo import BlameIndex
 from repo import RepoManager
 
 from argparse import ArgumentParser
+from collections import deque
 from collections import namedtuple
 from hashlib import sha256 as anon_hash
 from nltk.tag import pos_tag
 from nltk.tokenize import sent_tokenize
 from nltk.tokenize import word_tokenize
 from pathlib import Path
+import threading
+from threading import Thread
 from xml.etree import ElementTree
 
 import ast
 import clang.cindex
 import itertools as itr
 import logging
+import multiprocessing as mp
 import re
 import shutil
 import sys
@@ -394,88 +398,7 @@ def _get_token_text(token, language):
     return text
 
 
-def _accumulate_comments_from_source_file(path, repo, language):
-    '''Get all comments from a programming source file.
-
-    `path`: Path to file.
-    `repo`: RepoManager object associated with source file's repository.
-    `language`: Programming language associated with file.
-
-    Return: List of dicts where each dict corresponds to a single comment, with the
-            following keys:
-            - 'comment': Text of the comment.
-            - 'authors': List of anonymized author IDs, retrieved from repository blame
-                         data.
-            - 'revs': List of revision IDs, retrieved from repository blame data.
-            - 'path': Path to file. Same as `path` argument.
-            - 'first-line': First line the comment appears on in the file.
-            - 'last-line': Last line the comment appears on in the file.
-
-    '''
-    comment = ""
-    authors = set()
-    revs = set()
-    first_line = 0
-    last_line = 0
-    last_line_had_comment = False
-    first_comment_found = False
-    comment_dicts = []
-
-    blame_index = BlameIndex(repo, 'HEAD', path.relative_to(repo.dir))
-    last_line_with_comment = 0 # tokenize functions index lines from 1
-
-    for token in _get_comment_tokens_from_source_file(path, language):
-        token_start, token_end = _get_token_span(token, language)
-
-        if last_line_with_comment == token_start.line-1:
-            # Continuation of previous comment.
-            comment += f"{_get_token_text(token, language)}\n"
-            for blame in blame_index[token_start.line:token_end.line+1]:
-                authors.add(anonymize_id(blame.commit.author.name))
-                revs.add(blame.commit.name_rev[:7])
-            last_line = token_end.line
-
-        else:
-            # New comment.
-            if last_line_with_comment != 0:
-                # Accumulate previous comment.
-                if is_comment_code(comment, language):
-                    with open(BUILDNOTES_EXCLUDED_CODE_PATH, 'a') as f:
-                        f.write(comment)
-                        f.write(f"{'<>'*32}\n")
-                else:
-                    if validate_source_text_language(trim_comment_as_code(comment, language)):
-                        with open(BUILDNOTES_INCLUDED_CODE_PATH, 'a') as f:
-                            f.write(comment)
-                            f.write(f"{'<>'*32}\n")
-
-                    comment_dicts.append({
-                        'comment': comment,
-                        'authors': authors,
-                        'revs': revs,
-                        'path': path,
-                        'first-line': first_line,
-                        'last-line': last_line,
-                    })
-
-            comment = f"{_get_token_text(token, language)}\n"
-            authors = set(
-                anonymize_id(blame.commit.author.name)
-                for blame in blame_index[token_start.line:token_end.line+1]
-            )
-            revs = set(
-                blame.commit.name_rev[:7]
-                for blame in blame_index[token_start.line:token_end.line+1]
-            )
-            first_line = token_start.line
-
-        last_line_with_comment = token_end.line
-
-    return comment_dicts
-
-
-def _create_note_subelement(
-        parent,
+def _create_note_element(
         text,
         authors,
         revisions,
@@ -512,10 +435,7 @@ def _create_note_subelement(
     if note_type == NoteType.COMMENT and (first_line is None or last_line is None):
         raise ValueError(f"first_line and last_line cannot be `None` when `note_type` is `{NoteType.COMMENT}`")
 
-    note_elt = ElementTree.SubElement(
-        parent,
-        'note',
-    )
+    note_elt = ElementTree.Element('note')
 
     # XML element for repo.
     repo_elt = ElementTree.SubElement(note_elt, 'repo')
@@ -577,6 +497,121 @@ def _create_note_subelement(
     return note_elt
 
 
+def _accumulate_comments_from_source_file(path, repo, language):
+    '''Get all comments from a programming source file.
+
+    `path`: Path to file.
+    `repo`: RepoManager object associated with source file's repository.
+    `language`: Programming language associated with file.
+
+    Return: List of dicts where each dict corresponds to a single comment, with the
+            following keys:
+            - 'comment': Text of the comment.
+            - 'authors': List of anonymized author IDs, retrieved from repository blame
+                         data.
+            - 'revs': List of revision IDs, retrieved from repository blame data.
+            - 'path': Path to file. Same as `path` argument.
+            - 'first-line': First line the comment appears on in the file.
+            - 'last-line': Last line the comment appears on in the file.
+
+    '''
+    comment = ""
+    authors = set()
+    revs = set()
+    first_line = 0
+    last_line = 0
+    last_line_had_comment = False
+    first_comment_found = False
+    comment_elements = []
+
+    blame_index = BlameIndex(repo, 'HEAD', path.relative_to(repo.dir))
+    last_line_with_comment = 0 # tokenize functions index lines from 1
+
+    for token in _get_comment_tokens_from_source_file(path, language):
+        token_start, token_end = _get_token_span(token, language)
+
+        if last_line_with_comment == token_start.line-1:
+            # Continuation of previous comment.
+            comment += f"{_get_token_text(token, language)}\n"
+            for blame in blame_index[token_start.line:token_end.line+1]:
+                authors.add(anonymize_id(blame.commit.author.name))
+                revs.add(blame.commit.name_rev[:7])
+            last_line = token_end.line
+
+        else:
+            # New comment.
+            if last_line_with_comment != 0:
+                # Accumulate previous comment.
+                if is_comment_code(comment, language):
+                    with open(BUILDNOTES_EXCLUDED_CODE_PATH, 'a') as f:
+                        f.write(comment)
+                        f.write(f"{'<>'*32}\n")
+                else:
+                    if validate_source_text_language(trim_comment_as_code(comment, language)):
+                        with open(BUILDNOTES_INCLUDED_CODE_PATH, 'a') as f:
+                            f.write(comment)
+                            f.write(f"{'<>'*32}\n")
+
+                    comment_elements.append(_create_note_element(
+                        comment,
+                        authors,
+                        revs,
+                        NoteType.COMMENT,
+                        repo,
+                        path,
+                        first_line,
+                        last_line,
+                        language,
+                    ))
+
+            comment = f"{_get_token_text(token, language)}\n"
+            authors = set(
+                anonymize_id(blame.commit.author.name)
+                for blame in blame_index[token_start.line:token_end.line+1]
+            )
+            revs = set(
+                blame.commit.name_rev[:7]
+                for blame in blame_index[token_start.line:token_end.line+1]
+            )
+            first_line = token_start.line
+
+        last_line_with_comment = token_end.line
+
+    return comment_elements
+
+
+def _repo_path_comment_consumer(repo, paths, comment_element_lists_by_file):
+    '''Extract comments from all paths in a repo.
+
+    Intended to be run in one of several threads.
+
+    `repo`: RepoManager object.
+    `paths`: Thread-safe container (e.g. deque) of all file paths in the repo. Must be
+             enumerated (i.e. have the structure created by the `enumerate()` built-in).
+    `comment_element_lists_by_file`: Output object. Must be a thread-safe container
+                                     (e.g. deque) the same length as `paths`.
+
+    '''
+    while paths:
+        i, path = paths.pop()
+
+        logging.debug(f"thread={threading.get_ident()} index={i} path={path}")
+
+        language = validate_source_file_language(path)
+
+        if language:
+            try:
+                comment_elements = _accumulate_comments_from_source_file(path, repo, language)
+                comment_element_lists_by_file[i] = comment_elements
+
+            # Don't extract comments that we cannot read.
+            except TokenizationError:
+                comment_element_lists_by_file[i] = []
+
+        else:
+            comment_element_lists_by_file[i] = []
+
+
 def _create_repo_comments_xml_tree(repo):
     '''Extract comments from a repository and build an XML tree to contain them.
 
@@ -585,30 +620,23 @@ def _create_repo_comments_xml_tree(repo):
     Return: Corpus-ready ElementTree.ElementTree object
 
     '''
+    paths = deque(enumerate(repo.dir.glob('**/*')))
+    comment_element_lists_by_file = deque(len(paths) * [None])
+    threads = [
+        Thread(
+            target=_repo_path_comment_consumer,
+            args=[repo, paths, comment_element_lists_by_file],
+        ) for i in range(mp.cpu_count()) # TODO use arg
+    ]
+    for t in threads:
+        t.start()
+
+    while any(t.is_alive() for t in threads): pass
+
     root = ElementTree.Element('notes')
-    for source_path in repo.dir.glob('**/*'):
-        language = validate_source_file_language(source_path)
-
-        if language:
-            try:
-                comment_dicts = _accumulate_comments_from_source_file(source_path, repo, language)
-                for d in comment_dicts:
-                    _create_note_subelement(
-                        root,
-                        d['comment'],
-                        d['authors'],
-                        d['revs'],
-                        NoteType.COMMENT,
-                        repo,
-                        d['path'],
-                        d['first-line'],
-                        d['last-line'],
-                        language,
-                    )
-
-            # Don't extract comments for file that we cannot read.
-            except TokenizationError:
-                continue
+    for element in itr.chain(*comment_element_lists_by_file):
+        if element is not None:
+            root.append(element)
 
     return ElementTree.ElementTree(root)
 
@@ -646,14 +674,13 @@ def extract_data(force_reextract=()):
             changelogs_root = ElementTree.Element('notes')
             for commit in repo.git.iter_commits():
                 if commit.message:
-                    _create_note_subelement(
-                        changelogs_root,
+                    changelogs_root.append(_create_note_element(
                         normalize_string(commit.message),
                         [anonymize_id(commit.author.name)],
                         [commit.name_rev[:7]],
                         NoteType.CHANGELOG,
-                        repo
-                    )
+                        repo,
+                    ))
 
             changelogs_tree = ElementTree.ElementTree(changelogs_root)
             changelogs_tree.write(
