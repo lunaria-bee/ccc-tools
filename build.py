@@ -641,11 +641,10 @@ def _create_repo_comments_xml_tree(repo):
     return ElementTree.ElementTree(root)
 
 
-def extract_data(force_reextract=()):
+def extract_data(note_types=()):
     '''Extract data from downloaded repos.
 
-    force_reextract: Iterable of NoteType values. Data of these types will be extracted
-    from repos, even if that data has been extracted before.
+    `note_types`: Iterable of NoteType values. Only notes of this type will be extracted.
 
     '''
 
@@ -655,7 +654,7 @@ def extract_data(force_reextract=()):
 
     # Remove build_notes directory (if it exists).
     if (
-            NoteType.COMMENT in force_reextract
+            NoteType.COMMENT in note_types
             and BUILDNOTESDIR_PATH.is_dir()
     ):
         shutil.rmtree(BUILDNOTESDIR_PATH)
@@ -665,12 +664,9 @@ def extract_data(force_reextract=()):
         logging.info(f" {repo.name}")
 
         # Extract changelogs.
-        logging.debug(f"  {NoteType.CHANGELOG}")
         changelogs_path = CORPUSDIR_PATH / Path(f'{NoteType.CHANGELOG}.{repo.name}.xml')
-        if (
-                NoteType.CHANGELOG in force_reextract
-                or not changelogs_path.exists()
-        ):
+        if NoteType.CHANGELOG in note_types:
+            logging.debug(f"  {NoteType.CHANGELOG}")
             changelogs_root = ElementTree.Element('notes')
             for commit in repo.git.iter_commits():
                 if commit.message:
@@ -690,12 +686,9 @@ def extract_data(force_reextract=()):
             )
 
         # Extract comments.
-        logging.debug(f"  {NoteType.COMMENT}")
         comments_path = CORPUSDIR_PATH / Path(f'{NoteType.COMMENT}.{repo.name}.xml')
-        if (
-                NoteType.COMMENT in force_reextract
-                or not comments_path.exists()
-        ):
+        if NoteType.COMMENT in note_types:
+            logging.debug(f"  {NoteType.COMMENT}")
             comments_tree = _create_repo_comments_xml_tree(repo)
             comments_tree.write(
                 comments_path,
@@ -761,11 +754,7 @@ def main(argv):
 
     # Extract.
     if redo_level <= ConstructionStep.EXTRACT:
-        redo_note_types = note_types
-    else:
-        redo_note_types = tuple()
-
-    extract_data(force_reextract=redo_note_types)
+        extract_data(note_types=note_types)
 
 
 if __name__== '__main__': main(sys.argv[1:])
