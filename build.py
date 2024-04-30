@@ -113,6 +113,15 @@ parser.add_argument(
     help="Do not print any logging output to stderr.",
 )
 
+parser.add_argument(
+    '--build-notes',
+    action='store_true',
+    help="Write information about corpus construction to build_notes directory.",
+)
+
+
+WRITE_BUILD_NOTES = False
+
 
 class TokenizationError(Exception):
     pass
@@ -497,7 +506,7 @@ def _create_note_element(
     return note_elt
 
 
-def _accumulate_comments_from_source_file(path, repo, language):
+def _accumulate_comments_from_source_file(path, repo, language, write_build_notes=False):
     '''Get all comments from a programming source file.
 
     `path`: Path to file.
@@ -542,12 +551,15 @@ def _accumulate_comments_from_source_file(path, repo, language):
             # New comment.
             if last_line_with_comment != 0:
                 # Accumulate previous comment.
-                if is_comment_code(comment, language):
+                if write_build_notes and is_comment_code(comment, language):
                     with open(BUILDNOTES_EXCLUDED_CODE_PATH, 'a') as f:
                         f.write(comment)
                         f.write(f"{'<>'*32}\n")
                 else:
-                    if validate_source_text_language(trim_comment_as_code(comment, language)):
+                    if (
+                            write_build_notes
+                            and validate_source_text_language(trim_comment_as_code(comment, language))
+                    ):
                         with open(BUILDNOTES_INCLUDED_CODE_PATH, 'a') as f:
                             f.write(comment)
                             f.write(f"{'<>'*32}\n")
@@ -580,7 +592,12 @@ def _accumulate_comments_from_source_file(path, repo, language):
     return comment_elements
 
 
-def _repo_path_comment_consumer(repo, paths, comment_element_lists_by_file):
+def _repo_path_comment_consumer(
+        repo,
+        paths,
+        comment_element_lists_by_file,
+        write_build_notes=False,
+):
     '''Extract comments from all paths in a repo.
 
     Intended to be run in one of several threads.
@@ -606,7 +623,12 @@ def _repo_path_comment_consumer(repo, paths, comment_element_lists_by_file):
 
         if language:
             try:
-                comment_elements = _accumulate_comments_from_source_file(path, repo, language)
+                comment_elements = _accumulate_comments_from_source_file(
+                    path,
+                    repo,
+                    language,
+                    write_build_notes=write_build_notes,
+                )
                 comment_element_lists_by_file[i] = comment_elements
 
             # Don't extract comments that we cannot read.
@@ -617,7 +639,7 @@ def _repo_path_comment_consumer(repo, paths, comment_element_lists_by_file):
             comment_element_lists_by_file[i] = []
 
 
-def _create_repo_comments_xml_tree(repo):
+def _create_repo_comments_xml_tree(repo, write_build_notes=False):
     '''Extract comments from a repository and build an XML tree to contain them.
 
     `repo`: RepoManager object.
@@ -631,6 +653,7 @@ def _create_repo_comments_xml_tree(repo):
         Thread(
             target=_repo_path_comment_consumer,
             args=[repo, paths, comment_element_lists_by_file],
+            kwargs={'write_build_notes': write_build_notes},
         ) for i in range(mp.cpu_count()) # TODO use arg
     ]
     for t in threads:
@@ -646,7 +669,7 @@ def _create_repo_comments_xml_tree(repo):
     return ElementTree.ElementTree(root)
 
 
-def extract_data(note_types=()):
+def extract_data(note_types=(), write_build_notes=False):
     '''Extract data from downloaded repos.
 
     `note_types`: Iterable of NoteType values. Only notes of this type will be extracted.
@@ -657,14 +680,15 @@ def extract_data(note_types=()):
 
     CORPUSDIR_PATH.mkdir(exist_ok=True)
 
-    # Remove build_notes directory (if it exists).
-    if (
-            NoteType.COMMENT in note_types
-            and BUILDNOTESDIR_PATH.is_dir()
-    ):
-        shutil.rmtree(BUILDNOTESDIR_PATH)
+    if write_build_notes:
+        # Remove build_notes directory (if it exists).
+        if (
+                NoteType.COMMENT in note_types
+                and BUILDNOTESDIR_PATH.is_dir()
+        ):
+            shutil.rmtree(BUILDNOTESDIR_PATH)
 
-    BUILDNOTESDIR_PATH.mkdir()
+        BUILDNOTESDIR_PATH.mkdir()
 
     for repo in RepoManager.get_repolist():
         logging.info(f" {repo.name}")
@@ -695,7 +719,10 @@ def extract_data(note_types=()):
         comments_path = CORPUSDIR_PATH / Path(f'{NoteType.COMMENT}.{repo.name}.xml')
         if NoteType.COMMENT in note_types:
             logging.debug(f"  {NoteType.COMMENT}")
-            comments_tree = _create_repo_comments_xml_tree(repo)
+            comments_tree = _create_repo_comments_xml_tree(
+                repo,
+                write_build_notes=write_build_notes
+            )
             comments_tree.write(
                 comments_path,
                 encoding='utf-8',
@@ -760,7 +787,7 @@ def main(argv):
 
     # Extract.
     if redo_level <= ConstructionStep.EXTRACT:
-        extract_data(note_types=note_types)
+        extract_data(note_types=note_types, write_build_notes=args.build_notes)
 
 
 if __name__== '__main__': main(sys.argv[1:])
