@@ -589,7 +589,12 @@ def _repo_path_comment_consumer(repo, paths, comment_element_lists_by_file):
     `paths`: Thread-safe container (e.g. deque) of all file paths in the repo. Must be
              enumerated (i.e. have the structure created by the `enumerate()` built-in).
     `comment_element_lists_by_file`: Output object. Must be a thread-safe container
-                                     (e.g. deque) the same length as `paths`.
+                                     (e.g. deque) the same length as `paths`. The initial
+                                     contents of the container are irrelevant. After
+                                     execution of the function, will be a list of lists,
+                                     each list containing `ElementTree.Element` objects
+                                     for the XML representation of the comments extracted
+                                     from a single source file.
 
     '''
     while paths:
