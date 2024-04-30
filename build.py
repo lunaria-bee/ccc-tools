@@ -663,7 +663,8 @@ def extract_data(note_types=()):
             and BUILDNOTESDIR_PATH.is_dir()
     ):
         shutil.rmtree(BUILDNOTESDIR_PATH)
-        BUILDNOTESDIR_PATH.mkdir()
+
+    BUILDNOTESDIR_PATH.mkdir()
 
     for repo in RepoManager.get_repolist():
         logging.info(f" {repo.name}")
